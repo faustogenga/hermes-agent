@@ -67,6 +67,7 @@ AUTHOR_MAP = {
     "112503481+caentzminger@users.noreply.github.com": "caentzminger",
     "258577966+voidborne-d@users.noreply.github.com": "voidborne-d",
     "70424851+insecurejezza@users.noreply.github.com": "insecurejezza",
+    "254021826+dodo-reach@users.noreply.github.com": "dodo-reach",
     "259807879+Bartok9@users.noreply.github.com": "Bartok9",
     "241404605+MestreY0d4-Uninter@users.noreply.github.com": "MestreY0d4-Uninter",
     "268667990+Roy-oss1@users.noreply.github.com": "Roy-oss1",
@@ -77,6 +78,8 @@ AUTHOR_MAP = {
     "Asunfly@users.noreply.github.com": "Asunfly",
     "2500400+honghua@users.noreply.github.com": "honghua",
     "nish3451@users.noreply.github.com": "nish3451",
+    "Mibayy@users.noreply.github.com": "Mibayy",
+    "135070653+sgaofen@users.noreply.github.com": "sgaofen",
     # contributors (manual mapping from git names)
     "ahmedsherif95@gmail.com": "asheriif",
     "liujinkun@bytedance.com": "liujinkun2025",
@@ -153,6 +156,7 @@ AUTHOR_MAP = {
     "1115117931@qq.com": "aaronagent",
     "1506751656@qq.com": "hqhq1025",
     "364939526@qq.com": "luyao618",
+    "906014227@qq.com": "bingo906",
     "aaronwong1999@icloud.com": "AaronWong1999",
     "agents@kylefrench.dev": "DeployFaith",
     "angelos@oikos.lan.home.malaiwah.com": "angelos",
@@ -175,6 +179,7 @@ AUTHOR_MAP = {
     "duerzy@gmail.com": "duerzy",
     "emozilla@nousresearch.com": "emozilla",
     "fancydirty@gmail.com": "fancydirty",
+    "farion1231@gmail.com": "farion1231",
     "floptopbot33@gmail.com": "flobo3",
     "fontana.pedro93@gmail.com": "pefontana",
     "francis.x.fitzpatrick@gmail.com": "fxfitz",
@@ -271,6 +276,7 @@ AUTHOR_MAP = {
     "junminliu@gmail.com": "JimLiu",
     "jarvischer@gmail.com": "maxchernin",
     "levantam.98.2324@gmail.com": "LVT382009",
+    "zhurongcheng@rcrai.com": "heykb",
 }
 
 
