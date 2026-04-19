@@ -29,6 +29,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useI18n } from "@/i18n";
 import { useTheme } from "@/themes";
+import { OAuthProvidersCard } from "@/components/OAuthProvidersCard";
 
 // ---------------------------------------------------------------------------
 // Plugin registry — plugins call register() to add their component.
@@ -119,6 +120,7 @@ export function exposePluginSDK() {
       Tabs,
       TabsList,
       TabsTrigger,
+      OAuthProvidersCard,
     },
 
     // Utilities

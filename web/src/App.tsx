@@ -4,9 +4,10 @@ import {
   Activity, BarChart3, Clock, FileText, KeyRound,
   MessageSquare, Package, Settings, Puzzle,
   Sparkles, Terminal, Globe, Database, Shield,
-  Wrench, Zap, Heart, Star, Code, Eye,
+  Wrench, Zap, Heart, Star, Code, Eye, Bot,
 } from "lucide-react";
 import StatusPage from "@/pages/StatusPage";
+import AgentPage from "@/pages/AgentPage";
 import ConfigPage from "@/pages/ConfigPage";
 import EnvPage from "@/pages/EnvPage";
 import SessionsPage from "@/pages/SessionsPage";
@@ -33,6 +34,7 @@ interface NavItem {
 
 const BUILTIN_NAV: NavItem[] = [
   { path: "/", labelKey: "status", label: "Status", icon: Activity },
+  { path: "/agent", label: "Agent", icon: Bot },
   { path: "/sessions", labelKey: "sessions", label: "Sessions", icon: MessageSquare },
   { path: "/analytics", labelKey: "analytics", label: "Analytics", icon: BarChart3 },
   { path: "/logs", labelKey: "logs", label: "Logs", icon: FileText },
@@ -51,7 +53,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Activity, BarChart3, Clock, FileText, KeyRound,
   MessageSquare, Package, Settings, Puzzle,
   Sparkles, Terminal, Globe, Database, Shield,
-  Wrench, Zap, Heart, Star, Code, Eye,
+  Wrench, Zap, Heart, Star, Code, Eye, Bot,
 };
 
 /** Resolve a Lucide icon name to a component, fallback to Puzzle. */
@@ -158,6 +160,7 @@ export default function App() {
       <main className="relative z-2 mx-auto w-full max-w-[1400px] flex-1 px-3 sm:px-6 pt-16 sm:pt-20 pb-4 sm:pb-8">
         <Routes>
           <Route path="/" element={<StatusPage />} />
+          <Route path="/agent" element={<AgentPage />} />
           <Route path="/sessions" element={<SessionsPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/logs" element={<LogsPage />} />

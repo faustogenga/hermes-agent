@@ -15,6 +15,7 @@ import importlib.util
 import json
 import logging
 import os
+import re
 import secrets
 import sys
 import threading
@@ -718,6 +719,138 @@ def _denormalize_config_from_web(config: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             pass  # can't read disk config — just use the string form
     return config
+
+
+def _read_dashboard_text(path: Path | None) -> str:
+    try:
+        if not path:
+            return ""
+        return path.read_text(encoding="utf-8").strip()
+    except Exception:
+        return ""
+
+
+def _truncate_dashboard_text(text: str, max_chars: int = 4000) -> str:
+    if len(text) <= max_chars:
+        return text
+    head = int(max_chars * 0.75)
+    tail = max_chars - head
+    return f"{text[:head]}\n\n[...truncated...]\n\n{text[-tail:]}"
+
+
+def _compact_dashboard_text(text: str, max_chars: int = 240) -> str:
+    compact = re.sub(r"\s+", " ", text).strip()
+    if len(compact) <= max_chars:
+        return compact
+    return compact[: max_chars - 1].rstrip() + "…"
+
+
+def _strip_dashboard_comments(text: str) -> str:
+    return re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL).strip()
+
+
+def _derive_agent_identity(soul_content: str) -> tuple[str, str]:
+    cleaned = _strip_dashboard_comments(soul_content)
+    filtered_lines = []
+    for raw_line in cleaned.splitlines():
+        stripped = raw_line.strip()
+        if stripped.startswith("#"):
+            continue
+        filtered_lines.append(stripped)
+    filtered_text = "\n".join(filtered_lines).strip()
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", filtered_text) if p.strip()]
+
+    default_role = "Hermes Agent"
+    default_description = (
+        "Configurable CLI and dashboard agent with identity shaped by SOUL.md, AGENTS.md, "
+        "memory, and runtime configuration."
+    )
+    if not paragraphs:
+        return default_role, default_description
+    role = paragraphs[0]
+    description = paragraphs[1] if len(paragraphs) > 1 else paragraphs[0]
+    return role, description
+
+
+@app.get("/api/agent/profile")
+async def get_agent_profile():
+    config = load_config()
+    active_personality = str(config.get("display", {}).get("personality", "") or "")
+
+    soul_path = get_hermes_home() / "SOUL.md"
+    user_path = get_hermes_home() / "memories" / "USER.md"
+    memory_path = get_hermes_home() / "memories" / "MEMORY.md"
+
+    agents_path = None
+    for name in ("AGENTS.md", "agents.md"):
+        candidate = Path.cwd() / name
+        if candidate.exists():
+            agents_path = candidate
+            break
+
+    soul_content = _read_dashboard_text(soul_path)
+    agents_content = _read_dashboard_text(agents_path)
+    user_content = _read_dashboard_text(user_path)
+    memory_content = _read_dashboard_text(memory_path)
+    role, description = _derive_agent_identity(soul_content)
+
+    personalities = config.get("agent", {}).get("personalities", {})
+    personality_entry = personalities.get(active_personality) if isinstance(personalities, dict) else None
+    personality_prompt = ""
+    if isinstance(personality_entry, str):
+        personality_prompt = personality_entry
+    elif isinstance(personality_entry, dict):
+        personality_prompt = str(
+            personality_entry.get("system_prompt")
+            or personality_entry.get("description")
+            or ""
+        )
+
+    sources = [
+        {
+            "key": "soul",
+            "title": "SOUL.md",
+            "path": str(soul_path),
+            "present": bool(soul_content),
+            "summary": _compact_dashboard_text(soul_content) if soul_content else "Not configured.",
+            "content": _truncate_dashboard_text(soul_content),
+        },
+        {
+            "key": "agents",
+            "title": "AGENTS.md",
+            "path": str(agents_path) if agents_path else str(Path.cwd() / "AGENTS.md"),
+            "present": bool(agents_content),
+            "summary": _compact_dashboard_text(agents_content) if agents_content else "No project AGENTS.md found in the current working directory.",
+            "content": _truncate_dashboard_text(agents_content),
+        },
+        {
+            "key": "user",
+            "title": "USER.md",
+            "path": str(user_path),
+            "present": bool(user_content),
+            "summary": _compact_dashboard_text(user_content) if user_content else "No saved user profile yet.",
+            "content": _truncate_dashboard_text(user_content),
+        },
+        {
+            "key": "memory",
+            "title": "MEMORY.md",
+            "path": str(memory_path),
+            "present": bool(memory_content),
+            "summary": _compact_dashboard_text(memory_content) if memory_content else "No saved agent memory yet.",
+            "content": _truncate_dashboard_text(memory_content),
+        },
+    ]
+
+    return {
+        "name": "Hermes Agent",
+        "role": role,
+        "description": description,
+        "active_personality": active_personality,
+        "personality_prompt": personality_prompt,
+        "model": get_model_info(),
+        "sources": sources,
+        "source_map": {source["key"]: source for source in sources},
+    }
 
 
 @app.put("/api/config")
@@ -2209,6 +2342,9 @@ def _discover_dashboard_plugins() -> list:
 
 # Cache discovered plugins per-process (refresh on explicit re-scan).
 _dashboard_plugins_cache: Optional[list] = None
+# Track plugin API routers already mounted so rescan can attach newly added
+# plugins without duplicating existing routes.
+_mounted_plugin_api_names: set[str] = set()
 
 
 def _get_dashboard_plugins(force_rescan: bool = False) -> list:
@@ -2233,6 +2369,7 @@ async def get_dashboard_plugins():
 async def rescan_dashboard_plugins():
     """Force re-scan of dashboard plugins."""
     plugins = _get_dashboard_plugins(force_rescan=True)
+    _mount_plugin_api_routes()
     return {"ok": True, "count": len(plugins)}
 
 
@@ -2282,16 +2419,19 @@ def _mount_plugin_api_routes():
     ``/api/plugins/<name>/``.
     """
     for plugin in _get_dashboard_plugins():
+        plugin_name = plugin["name"]
+        if plugin_name in _mounted_plugin_api_names:
+            continue
         api_file_name = plugin.get("_api_file")
         if not api_file_name:
             continue
         api_path = Path(plugin["_dir"]) / api_file_name
         if not api_path.exists():
-            _log.warning("Plugin %s declares api=%s but file not found", plugin["name"], api_file_name)
+            _log.warning("Plugin %s declares api=%s but file not found", plugin_name, api_file_name)
             continue
         try:
             spec = importlib.util.spec_from_file_location(
-                f"hermes_dashboard_plugin_{plugin['name']}", api_path,
+                f"hermes_dashboard_plugin_{plugin_name}", api_path,
             )
             if spec is None or spec.loader is None:
                 continue
@@ -2299,12 +2439,13 @@ def _mount_plugin_api_routes():
             spec.loader.exec_module(mod)
             router = getattr(mod, "router", None)
             if router is None:
-                _log.warning("Plugin %s api file has no 'router' attribute", plugin["name"])
+                _log.warning("Plugin %s api file has no 'router' attribute", plugin_name)
                 continue
-            app.include_router(router, prefix=f"/api/plugins/{plugin['name']}")
-            _log.info("Mounted plugin API routes: /api/plugins/%s/", plugin["name"])
+            app.include_router(router, prefix=f"/api/plugins/{plugin_name}")
+            _mounted_plugin_api_names.add(plugin_name)
+            _log.info("Mounted plugin API routes: /api/plugins/%s/", plugin_name)
         except Exception as exc:
-            _log.warning("Failed to load plugin %s API routes: %s", plugin["name"], exc)
+            _log.warning("Failed to load plugin %s API routes: %s", plugin_name, exc)
 
 
 # Mount plugin API routes before the SPA catch-all.

@@ -2,6 +2,24 @@
 
 Instructions for AI coding assistants and developers working on the hermes-agent codebase.
 
+## Product context: Lead Hunter specialization
+
+This working copy is being tuned for a specialized local-business lead-generation workflow for a web/app development agency.
+
+Current business goal:
+- find high-quality local SMB leads that are good businesses but weak digitally
+- default market is Brussels, Belgium
+- prioritize businesses with no website, outdated websites, weak conversion funnels, weak social presence, or incomplete Google Business profiles
+- support verified research first, then optional enrichment via Hunter and Apollo
+- produce outreach-ready leads for selling websites, apps, booking flows, automation, and local SEO improvements
+
+When changing agent identity, dashboard surfaces, or lead-hunter tooling, preserve and reinforce this specialization rather than drifting back to a generic assistant.
+
+Dashboard expectations tied to this specialization:
+- the Keys page should expose Hunter and Apollo credentials when configured in `OPTIONAL_ENV_VARS`
+- the Agent page should make the active SOUL/personality visible so users can confirm the business-finder persona is loaded
+- changes that affect dashboard UI must be rebuilt into `hermes_cli/web_dist/`
+
 ## Development Environment
 
 ```bash

@@ -1,11 +1,11 @@
 {
-  "name": "example",
-  "label": "Example",
-  "description": "Example dashboard plugin — demonstrates the plugin SDK",
-  "icon": "Sparkles",
-  "version": "1.0.0",
+  "name": "connections",
+  "label": "Connections",
+  "description": "GitHub and provider connection status for the Hermes dashboard",
+  "icon": "Shield",
+  "version": "1.1.0",
   "tab": {
-    "path": "/example",
+    "path": "/connections",
     "position": "after:skills"
   },
   "entry": "dist/index.js",

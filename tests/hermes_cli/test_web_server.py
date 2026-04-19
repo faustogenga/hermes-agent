@@ -206,12 +206,77 @@ class TestWebServerEndpoints:
         defaults = resp.json()
         assert "model" in defaults
 
+    def test_get_agent_profile(self, monkeypatch, tmp_path):
+        import hermes_cli.web_server as web_server
+
+        hermes_home = tmp_path / "hermes-home"
+        memories_dir = hermes_home / "memories"
+        memories_dir.mkdir(parents=True)
+        (hermes_home / "SOUL.md").write_text(
+            "You are Hermes, an evidence-first dashboard copilot.\n\nKeep explanations concise.",
+            encoding="utf-8",
+        )
+        (memories_dir / "USER.md").write_text(
+            "User prefers Brussels-focused SMB lead generation.",
+            encoding="utf-8",
+        )
+        (memories_dir / "MEMORY.md").write_text(
+            "Remember to prioritize verified weak digital presence.",
+            encoding="utf-8",
+        )
+
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        (workspace / "AGENTS.md").write_text(
+            "# Project instructions\n\nAlways validate dashboard changes with tests.",
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(web_server, "get_hermes_home", lambda: hermes_home)
+        monkeypatch.setattr(
+            web_server,
+            "load_config",
+            lambda: {
+                "model": {"default": "openai/gpt-5", "provider": "openai"},
+                "display": {"personality": "kawaii"},
+                "agent": {
+                    "personalities": {
+                        "kawaii": "Friendly and concise.",
+                    }
+                },
+            },
+        )
+        monkeypatch.chdir(workspace)
+
+        resp = self.client.get("/api/agent/profile")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["name"] == "Hermes Agent"
+        assert data["role"] == "You are Hermes, an evidence-first dashboard copilot."
+        assert data["active_personality"] == "kawaii"
+        assert data["model"]["model"] == "openai/gpt-5"
+        assert data["source_map"]["soul"]["path"].endswith("SOUL.md")
+        assert "Keep explanations concise." in data["source_map"]["soul"]["content"]
+        assert "Project instructions" in data["source_map"]["agents"]["content"]
+        assert "Brussels-focused SMB lead generation" in data["source_map"]["user"]["content"]
+        assert "verified weak digital presence" in data["source_map"]["memory"]["content"]
+
     def test_get_env_vars(self):
         resp = self.client.get("/api/env")
         assert resp.status_code == 200
         data = resp.json()
         # Should contain known env var names
         assert any(k.endswith("_API_KEY") or k.endswith("_TOKEN") for k in data.keys())
+        assert "HUNTER_API_KEY" in data
+        assert "APOLLO_API_KEY" in data
+        assert "GITHUB_TOKEN" in data
+        assert "GH_TOKEN" in data
+        assert "COPILOT_GITHUB_TOKEN" in data
+        assert data["HUNTER_API_KEY"]["category"] == "tool"
+        assert data["APOLLO_API_KEY"]["category"] == "tool"
+        assert data["GITHUB_TOKEN"]["category"] == "tool"
+        assert data["GH_TOKEN"]["category"] == "tool"
+        assert data["COPILOT_GITHUB_TOKEN"]["category"] == "tool"
 
     def test_reveal_env_var(self, tmp_path):
         """POST /api/env/reveal should return the real unredacted value."""

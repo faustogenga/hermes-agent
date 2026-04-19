@@ -58,6 +58,7 @@ export const api = {
   getDefaults: () => fetchJSON<Record<string, unknown>>("/api/config/defaults"),
   getSchema: () => fetchJSON<{ fields: Record<string, unknown>; category_order: string[] }>("/api/config/schema"),
   getModelInfo: () => fetchJSON<ModelInfoResponse>("/api/model/info"),
+  getAgentProfile: () => fetchJSON<AgentProfileResponse>("/api/agent/profile"),
   saveConfig: (config: Record<string, unknown>) =>
     fetchJSON<{ ok: boolean }>("/api/config", {
       method: "PUT",
@@ -373,6 +374,26 @@ export interface ModelInfoResponse {
     max_output_tokens?: number;
     model_family?: string;
   };
+}
+
+export interface AgentProfileSource {
+  key: string;
+  title: string;
+  path: string;
+  present: boolean;
+  summary: string;
+  content: string;
+}
+
+export interface AgentProfileResponse {
+  name: string;
+  role: string;
+  description: string;
+  active_personality: string;
+  personality_prompt: string;
+  model: ModelInfoResponse;
+  sources: AgentProfileSource[];
+  source_map: Record<string, AgentProfileSource>;
 }
 
 // ── OAuth provider types ────────────────────────────────────────────────
