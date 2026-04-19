@@ -110,6 +110,9 @@ COMMAND_REGISTRY: list[CommandDef] = [
 
     CommandDef("personality", "Set a predefined personality", "Configuration",
                args_hint="[name]"),
+    CommandDef("agent", "Show, list, or switch agent presets", "Configuration",
+               args_hint="[list|show|use <slug>]",
+               subcommands=("list", "show", "use")),
     CommandDef("statusbar", "Toggle the context/model status bar", "Configuration",
                cli_only=True, aliases=("sb",)),
     CommandDef("verbose", "Cycle tool progress display: off -> new -> all -> verbose",

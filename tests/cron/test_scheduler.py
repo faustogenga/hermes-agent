@@ -1065,6 +1065,42 @@ class TestRunJobSkillBacked:
         assert "Instructions for find-nearby." in prompt_arg
         assert "Combine the results." in prompt_arg
 
+    def test_run_job_passes_agent_preset_to_ai_agent(self, tmp_path):
+        job = {
+            "id": "agent-preset-job",
+            "name": "preset job",
+            "prompt": "Run the preset task.",
+            "agent_name": "lead-hunter",
+        }
+
+        fake_db = MagicMock()
+
+        with patch("cron.scheduler._hermes_home", tmp_path), \
+             patch("cron.scheduler._resolve_origin", return_value=None), \
+             patch("dotenv.load_dotenv"), \
+             patch("hermes_state.SessionDB", return_value=fake_db), \
+             patch(
+                 "hermes_cli.runtime_provider.resolve_runtime_provider",
+                 return_value={
+                     "api_key": "***",
+                     "base_url": "https://example.invalid/v1",
+                     "provider": "openrouter",
+                     "api_mode": "chat_completions",
+                 },
+             ), \
+             patch("run_agent.AIAgent") as mock_agent_cls:
+            mock_agent = MagicMock()
+            mock_agent.run_conversation.return_value = {"final_response": "ok"}
+            mock_agent_cls.return_value = mock_agent
+
+            success, output, final_response, error = run_job(job)
+
+        assert success is True
+        assert error is None
+        assert final_response == "ok"
+        kwargs = mock_agent_cls.call_args.kwargs
+        assert kwargs["agent_preset"] == "lead-hunter"
+
 
 class TestSilentDelivery:
     """Verify that [SILENT] responses suppress delivery while still saving output."""
@@ -1279,6 +1315,15 @@ class TestRunJobWakeGate:
         })
         with patch.object(scheduler, "_run_job_script",
                           return_value=(True, script_output)), \
+             patch(
+                 "hermes_cli.runtime_provider.resolve_runtime_provider",
+                 return_value={
+                     "api_key": "***",
+                     "base_url": "https://example.invalid/v1",
+                     "provider": "openrouter",
+                     "api_mode": "chat_completions",
+                 },
+             ), \
              patch("run_agent.AIAgent", return_value=agent) as agent_cls:
             success, doc, final, err = scheduler.run_job(self._make_job())
 
@@ -1308,6 +1353,15 @@ class TestRunJobWakeGate:
             "final_response": "ok", "messages": []
         })
         with patch.object(scheduler, "_run_job_script", side_effect=_script_stub), \
+             patch(
+                 "hermes_cli.runtime_provider.resolve_runtime_provider",
+                 return_value={
+                     "api_key": "***",
+                     "base_url": "https://example.invalid/v1",
+                     "provider": "openrouter",
+                     "api_mode": "chat_completions",
+                 },
+             ), \
              patch("run_agent.AIAgent", return_value=agent):
             scheduler.run_job(self._make_job())
 
@@ -1326,6 +1380,15 @@ class TestRunJobWakeGate:
         })
         with patch.object(scheduler, "_run_job_script",
                           return_value=(False, '{"wakeAgent": false}')), \
+             patch(
+                 "hermes_cli.runtime_provider.resolve_runtime_provider",
+                 return_value={
+                     "api_key": "***",
+                     "base_url": "https://example.invalid/v1",
+                     "provider": "openrouter",
+                     "api_mode": "chat_completions",
+                 },
+             ), \
              patch("run_agent.AIAgent", return_value=agent) as agent_cls:
             success, doc, final, err = scheduler.run_job(self._make_job())
 
@@ -1342,6 +1405,15 @@ class TestRunJobWakeGate:
         job = self._make_job(script=None)
         job.pop("script", None)
         with patch.object(scheduler, "_run_job_script") as script_fn, \
+             patch(
+                 "hermes_cli.runtime_provider.resolve_runtime_provider",
+                 return_value={
+                     "api_key": "***",
+                     "base_url": "https://example.invalid/v1",
+                     "provider": "openrouter",
+                     "api_mode": "chat_completions",
+                 },
+             ), \
              patch("run_agent.AIAgent", return_value=agent) as agent_cls:
             scheduler.run_job(job)
 

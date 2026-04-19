@@ -66,6 +66,9 @@ function buildNavItems(builtIn: NavItem[], plugins: RegisteredPlugin[]): NavItem
   const items = [...builtIn];
 
   for (const { manifest } of plugins) {
+    if (manifest.tab?.hidden) {
+      continue;
+    }
     const pluginItem: NavItem = {
       path: manifest.tab.path,
       label: manifest.label,
@@ -161,6 +164,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<StatusPage />} />
           <Route path="/agent" element={<AgentPage />} />
+          <Route path="/agents" element={<Navigate to="/agent" replace />} />
           <Route path="/sessions" element={<SessionsPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/logs" element={<LogsPage />} />

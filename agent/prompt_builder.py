@@ -891,12 +891,12 @@ def _truncate_content(content: str, filename: str, max_chars: int = CONTEXT_FILE
     return head + marker + tail
 
 
-def load_soul_md() -> Optional[str]:
-    """Load SOUL.md from HERMES_HOME and return its content, or None.
+def load_soul_md(agent_preset=None) -> Optional[str]:
+    """Load SOUL.md for the active agent preset and return its content, or None.
 
-    Used as the agent identity (slot #1 in the system prompt).  When this
-    returns content, ``build_context_files_prompt`` should be called with
-    ``skip_soul=True`` so SOUL.md isn't injected twice.
+    Used as the agent identity (slot #1 in the system prompt). When this returns
+    content, ``build_context_files_prompt`` should be called with ``skip_soul=True``
+    so SOUL.md isn't injected twice.
     """
     try:
         from hermes_cli.config import ensure_hermes_home
@@ -904,14 +904,15 @@ def load_soul_md() -> Optional[str]:
     except Exception as e:
         logger.debug("Could not ensure HERMES_HOME before loading SOUL.md: %s", e)
 
-    soul_path = get_hermes_home() / "SOUL.md"
+    soul_path = getattr(agent_preset, "soul_path", None) or (get_hermes_home() / "SOUL.md")
     if not soul_path.exists():
         return None
     try:
         content = soul_path.read_text(encoding="utf-8").strip()
         if not content:
             return None
-        content = _scan_context_content(content, "SOUL.md")
+        filename = f"{getattr(agent_preset, 'slug', 'default')}/SOUL.md" if agent_preset and getattr(agent_preset, 'slug', 'default') != 'default' else "SOUL.md"
+        content = _scan_context_content(content, filename)
         content = _truncate_content(content, "SOUL.md")
         return content
     except Exception as e:
@@ -1004,20 +1005,18 @@ def _load_cursorrules(cwd_path: Path) -> str:
     return _truncate_content(cursorrules_content, ".cursorrules")
 
 
-def build_context_files_prompt(cwd: Optional[str] = None, skip_soul: bool = False) -> str:
+def build_context_files_prompt(cwd: Optional[str] = None, skip_soul: bool = False, agent_preset=None) -> str:
     """Discover and load context files for the system prompt.
 
-    Priority (first found wins — only ONE project context type is loaded):
-      1. .hermes.md / HERMES.md  (walk to git root)
-      2. AGENTS.md / agents.md   (cwd only)
-      3. CLAUDE.md / claude.md   (cwd only)
-      4. .cursorrules / .cursor/rules/*.mdc  (cwd only)
+    Priority (first found wins for project context):
+      1. .hermes.md / HERMES.md (walk to git root)
+      2. preset AGENTS.md (when a custom agent preset provides one)
+      3. cwd AGENTS.md / agents.md
+      4. CLAUDE.md / claude.md
+      5. .cursorrules / .cursor/rules/*.mdc
 
-    SOUL.md from HERMES_HOME is independent and always included when present.
-    Each context source is capped at 20,000 chars.
-
-    When *skip_soul* is True, SOUL.md is not included here (it was already
-    loaded via ``load_soul_md()`` for the identity slot).
+    SOUL.md from HERMES_HOME or the active preset is independent and always
+    included when present.
     """
     if cwd is None:
         cwd = os.getcwd()
@@ -1025,9 +1024,20 @@ def build_context_files_prompt(cwd: Optional[str] = None, skip_soul: bool = Fals
     cwd_path = Path(cwd).resolve()
     sections = []
 
-    # Priority-based project context: first match wins
+    preset_agents = ""
+    preset_agents_path = getattr(agent_preset, "agents_path", None)
+    if preset_agents_path and preset_agents_path.exists():
+        try:
+            content = preset_agents_path.read_text(encoding="utf-8").strip()
+            if content:
+                content = _scan_context_content(content, f"{getattr(agent_preset, 'slug', 'preset')}/AGENTS.md")
+                preset_agents = _truncate_content(f"## Preset AGENTS.md\n\n{content}", "AGENTS.md")
+        except Exception as e:
+            logger.debug("Could not read preset AGENTS.md from %s: %s", preset_agents_path, e)
+
     project_context = (
         _load_hermes_md(cwd_path)
+        or preset_agents
         or _load_agents_md(cwd_path)
         or _load_claude_md(cwd_path)
         or _load_cursorrules(cwd_path)
@@ -1035,12 +1045,9 @@ def build_context_files_prompt(cwd: Optional[str] = None, skip_soul: bool = Fals
     if project_context:
         sections.append(project_context)
 
-    # SOUL.md from HERMES_HOME only — skip when already loaded as identity
     if not skip_soul:
-        soul_content = load_soul_md()
+        soul_content = load_soul_md(agent_preset=agent_preset)
         if soul_content:
-            sections.append(soul_content)
+            sections.append(f"## SOUL.md\n\n{soul_content}")
 
-    if not sections:
-        return ""
-    return "# Project Context\n\nThe following project context files have been loaded and should be followed:\n\n" + "\n".join(sections)
+    return "\n\n".join(s for s in sections if s).strip()

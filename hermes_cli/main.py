@@ -1114,6 +1114,7 @@ def cmd_chat(args):
         "provider": getattr(args, "provider", None),
         "toolsets": args.toolsets,
         "skills": getattr(args, "skills", None),
+        "agent_preset": getattr(args, "agent", None),
         "verbose": args.verbose,
         "quiet": getattr(args, "quiet", False),
         "query": args.query,
@@ -6354,6 +6355,11 @@ For more help on a command:
         help="Preload one or more skills for the session (repeat flag or comma-separate)",
     )
     parser.add_argument(
+        "--agent",
+        default=None,
+        help="Run the session with a specific agent preset slug",
+    )
+    parser.add_argument(
         "--yolo",
         action="store_true",
         default=False,
@@ -6407,6 +6413,11 @@ For more help on a command:
         action="append",
         default=argparse.SUPPRESS,
         help="Preload one or more skills for the session (repeat flag or comma-separate)",
+    )
+    chat_parser.add_argument(
+        "--agent",
+        default=argparse.SUPPRESS,
+        help="Run the session with a specific agent preset slug",
     )
     chat_parser.add_argument(
         "--provider",
@@ -8414,6 +8425,7 @@ Examples:
             ("model", None),
             ("provider", None),
             ("toolsets", None),
+            ("agent", None),
             ("verbose", False),
             ("worktree", False),
         ]:
@@ -8424,11 +8436,13 @@ Examples:
 
     # Default to chat if no command specified
     if args.command is None:
+        args.command = "chat"
         for attr, default in [
             ("query", None),
             ("model", None),
             ("provider", None),
             ("toolsets", None),
+            ("agent", None),
             ("verbose", False),
             ("resume", None),
             ("continue_last", None),

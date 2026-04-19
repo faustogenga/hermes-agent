@@ -47,6 +47,14 @@ from hermes_cli.config import (
     redact_key,
 )
 from gateway.status import get_running_pid, read_runtime_status
+from agent.agent_presets import (
+    delete_agent_preset,
+    get_active_agent_slug,
+    list_agent_presets,
+    read_agent_preset_source,
+    resolve_agent_preset,
+    save_agent_preset,
+)
 
 try:
     from fastapi import FastAPI, HTTPException, Request
@@ -316,6 +324,23 @@ CONFIG_SCHEMA = _ordered_schema
 
 class ConfigUpdate(BaseModel):
     config: dict
+
+
+class AgentPresetPayload(BaseModel):
+    name: str
+    slug: Optional[str] = None
+    emoji: str = "🤖"
+    role: str = ""
+    goal: str = ""
+    description: str = ""
+    personality: str = ""
+    default_skills: List[str] = []
+    soul_content: str = ""
+    agents_content: str = ""
+
+
+class AgentActivatePayload(BaseModel):
+    slug: Optional[str] = None
 
 
 class EnvVarUpdate(BaseModel):
@@ -772,85 +797,208 @@ def _derive_agent_identity(soul_content: str) -> tuple[str, str]:
     return role, description
 
 
-@app.get("/api/agent/profile")
-async def get_agent_profile():
-    config = load_config()
-    active_personality = str(config.get("display", {}).get("personality", "") or "")
+def _resolve_personality_prompt(config: dict, personality_name: str) -> str:
+    personalities = config.get("agent", {}).get("personalities", {})
+    personality_entry = personalities.get(personality_name) if isinstance(personalities, dict) else None
+    if isinstance(personality_entry, str):
+        return personality_entry
+    if isinstance(personality_entry, dict):
+        return str(personality_entry.get("system_prompt") or personality_entry.get("description") or "")
+    return ""
 
-    soul_path = get_hermes_home() / "SOUL.md"
+
+def _agent_source_card(key: str, title: str, path: Optional[Path], content: str, missing_summary: str) -> dict[str, Any]:
+    return {
+        "key": key,
+        "title": title,
+        "path": str(path) if path else "",
+        "present": bool(content),
+        "summary": _compact_dashboard_text(content) if content else missing_summary,
+        "content": _truncate_dashboard_text(content),
+    }
+
+
+def _serialize_agent_preset(preset, config: dict, *, active_slug: str) -> dict[str, Any]:
+    soul_content = read_agent_preset_source(preset.soul_path)
+    agents_content = read_agent_preset_source(preset.agents_path)
+    role, description = _derive_agent_identity(soul_content)
+    return {
+        "name": preset.name,
+        "slug": preset.slug,
+        "emoji": preset.emoji,
+        "role": preset.role or role,
+        "goal": preset.goal,
+        "description": preset.description or description,
+        "personality": preset.personality,
+        "personality_prompt": _resolve_personality_prompt(config, preset.personality),
+        "default_skills": list(preset.default_skills),
+        "built_in": preset.built_in,
+        "active": preset.slug == active_slug,
+        "soul_content": soul_content,
+        "agents_content": agents_content,
+        "soul_path": str(preset.soul_path) if preset.soul_path else None,
+        "agents_path": str(preset.agents_path) if preset.agents_path else None,
+        "metadata_path": str(preset.metadata_path) if preset.metadata_path else None,
+    }
+
+
+def _build_agent_profile_payload(config: dict) -> dict[str, Any]:
+    active_slug = get_active_agent_slug(config)
+    preset = resolve_agent_preset(active_slug, config=config)
     user_path = get_hermes_home() / "memories" / "USER.md"
     memory_path = get_hermes_home() / "memories" / "MEMORY.md"
 
-    agents_path = None
-    for name in ("AGENTS.md", "agents.md"):
-        candidate = Path.cwd() / name
-        if candidate.exists():
-            agents_path = candidate
-            break
-
-    soul_content = _read_dashboard_text(soul_path)
-    agents_content = _read_dashboard_text(agents_path)
+    soul_content = read_agent_preset_source(preset.soul_path)
+    agents_content = read_agent_preset_source(preset.agents_path)
     user_content = _read_dashboard_text(user_path)
     memory_content = _read_dashboard_text(memory_path)
-    role, description = _derive_agent_identity(soul_content)
-
-    personalities = config.get("agent", {}).get("personalities", {})
-    personality_entry = personalities.get(active_personality) if isinstance(personalities, dict) else None
-    personality_prompt = ""
-    if isinstance(personality_entry, str):
-        personality_prompt = personality_entry
-    elif isinstance(personality_entry, dict):
-        personality_prompt = str(
-            personality_entry.get("system_prompt")
-            or personality_entry.get("description")
-            or ""
-        )
+    serialized_presets = [_serialize_agent_preset(item, config, active_slug=active_slug) for item in list_agent_presets()]
+    current_preset = next((item for item in serialized_presets if item["slug"] == preset.slug), None) or serialized_presets[0]
+    role = current_preset["role"]
+    description = current_preset["description"]
 
     sources = [
-        {
-            "key": "soul",
-            "title": "SOUL.md",
-            "path": str(soul_path),
-            "present": bool(soul_content),
-            "summary": _compact_dashboard_text(soul_content) if soul_content else "Not configured.",
-            "content": _truncate_dashboard_text(soul_content),
-        },
-        {
-            "key": "agents",
-            "title": "AGENTS.md",
-            "path": str(agents_path) if agents_path else str(Path.cwd() / "AGENTS.md"),
-            "present": bool(agents_content),
-            "summary": _compact_dashboard_text(agents_content) if agents_content else "No project AGENTS.md found in the current working directory.",
-            "content": _truncate_dashboard_text(agents_content),
-        },
-        {
-            "key": "user",
-            "title": "USER.md",
-            "path": str(user_path),
-            "present": bool(user_content),
-            "summary": _compact_dashboard_text(user_content) if user_content else "No saved user profile yet.",
-            "content": _truncate_dashboard_text(user_content),
-        },
-        {
-            "key": "memory",
-            "title": "MEMORY.md",
-            "path": str(memory_path),
-            "present": bool(memory_content),
-            "summary": _compact_dashboard_text(memory_content) if memory_content else "No saved agent memory yet.",
-            "content": _truncate_dashboard_text(memory_content),
-        },
+        _agent_source_card(
+            "soul",
+            "SOUL.md",
+            preset.soul_path,
+            soul_content,
+            "No SOUL.md configured for this preset.",
+        ),
+        _agent_source_card(
+            "agents",
+            "AGENTS.md",
+            preset.agents_path,
+            agents_content,
+            "No preset AGENTS.md configured.",
+        ),
+        _agent_source_card(
+            "user",
+            "USER.md",
+            user_path,
+            user_content,
+            "No saved user profile yet.",
+        ),
+        _agent_source_card(
+            "memory",
+            "MEMORY.md",
+            memory_path,
+            memory_content,
+            "No saved agent memory yet.",
+        ),
     ]
 
+    available_personalities = []
+    personalities = config.get("agent", {}).get("personalities", {})
+    if isinstance(personalities, dict):
+        available_personalities = sorted(str(name) for name in personalities.keys())
+
     return {
-        "name": "Hermes Agent",
+        "name": preset.name,
         "role": role,
         "description": description,
-        "active_personality": active_personality,
-        "personality_prompt": personality_prompt,
+        "active_personality": current_preset.get("personality") or "",
+        "personality_prompt": current_preset.get("personality_prompt") or "",
+        "active_preset": preset.slug,
+        "presets": serialized_presets,
+        "current_preset": current_preset,
+        "available_personalities": available_personalities,
+        "cron_examples": [
+            {
+                "name": f"Run as {preset.slug}",
+                "payload": {
+                    "action": "create",
+                    "name": f"{preset.name} scheduled task",
+                    "schedule": "0 9 * * *",
+                    "agent_name": preset.slug,
+                    "prompt": "Describe the task to run under this preset.",
+                },
+            }
+        ],
         "model": get_model_info(),
         "sources": sources,
         "source_map": {source["key"]: source for source in sources},
     }
+
+
+@app.get("/api/agent/profile")
+async def get_agent_profile():
+    config = load_config()
+    return _build_agent_profile_payload(config)
+
+
+@app.get("/api/agents")
+async def get_agents():
+    config = load_config()
+    payload = _build_agent_profile_payload(config)
+    return {
+        "active_preset": payload["active_preset"],
+        "presets": payload["presets"],
+        "available_personalities": payload["available_personalities"],
+    }
+
+
+@app.post("/api/agents")
+async def create_agent(body: AgentPresetPayload):
+    config = load_config()
+    existing = {preset.slug for preset in list_agent_presets()}
+    requested_slug = body.slug or body.name
+    preset_slug = re.sub(r"[^a-z0-9]+", "-", requested_slug.lower()).strip("-") or "default"
+    if preset_slug in existing:
+        raise HTTPException(status_code=409, detail=f"Agent preset already exists: {preset_slug}")
+    preset = save_agent_preset(
+        preset_slug,
+        metadata=body.model_dump(),
+        soul_content=body.soul_content,
+        agents_content=body.agents_content,
+    )
+    return _serialize_agent_preset(preset, config, active_slug=get_active_agent_slug(config))
+
+
+@app.put("/api/agents/{slug}")
+async def update_agent(slug: str, body: AgentPresetPayload):
+    normalized = re.sub(r"[^a-z0-9]+", "-", slug.lower()).strip("-") or "default"
+    if normalized == "default":
+        raise HTTPException(status_code=400, detail="The built-in default preset is read-only")
+    try:
+        preset = save_agent_preset(
+            normalized,
+            metadata={**body.model_dump(), "slug": normalized},
+            soul_content=body.soul_content,
+            agents_content=body.agents_content,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    config = load_config()
+    return _serialize_agent_preset(preset, config, active_slug=get_active_agent_slug(config))
+
+
+@app.delete("/api/agents/{slug}")
+async def remove_agent(slug: str):
+    config = load_config()
+    try:
+        delete_agent_preset(slug)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if get_active_agent_slug(config) == slug:
+        config.setdefault("agent", {})["active_preset"] = "default"
+        save_config(config)
+    return {"ok": True}
+
+
+@app.post("/api/agents/{slug}/activate")
+async def activate_agent(slug: str, body: Optional[AgentActivatePayload] = None):
+    config = load_config()
+    target_slug = (body.slug if body and body.slug else slug) or slug
+    normalized = re.sub(r"[^a-z0-9]+", "-", target_slug.lower()).strip("-") or "default"
+    available = {preset.slug for preset in list_agent_presets()}
+    if normalized not in available:
+        raise HTTPException(status_code=404, detail=f"Agent preset not found: {normalized}")
+    config.setdefault("agent", {})["active_preset"] = normalized
+    save_config(config)
+    return {"ok": True, "active_preset": normalized}
 
 
 @app.put("/api/config")
@@ -1910,6 +2058,7 @@ class CronJobCreate(BaseModel):
     schedule: str
     name: str = ""
     deliver: str = "local"
+    agent_name: Optional[str] = None
 
 
 class CronJobUpdate(BaseModel):
@@ -1936,7 +2085,7 @@ async def create_cron_job(body: CronJobCreate):
     from cron.jobs import create_job
     try:
         job = create_job(prompt=body.prompt, schedule=body.schedule,
-                         name=body.name, deliver=body.deliver)
+                         name=body.name, deliver=body.deliver, agent_name=body.agent_name)
         return job
     except Exception as e:
         _log.exception("POST /api/cron/jobs failed")
@@ -2297,6 +2446,7 @@ def _discover_dashboard_plugins() -> list:
                     "icon": data.get("icon", "Puzzle"),
                     "version": data.get("version", "0.0.0"),
                     "tab": data.get("tab", {"path": f"/{name}", "position": "end"}),
+                    "agentPage": data.get("agentPage"),
                     "entry": data.get("entry", "dist/index.js"),
                     "css": data.get("css"),
                     "has_api": bool(data.get("api")),

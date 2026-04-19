@@ -210,6 +210,7 @@ class TestWebServerEndpoints:
         import hermes_cli.web_server as web_server
 
         hermes_home = tmp_path / "hermes-home"
+        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
         memories_dir = hermes_home / "memories"
         memories_dir.mkdir(parents=True)
         (hermes_home / "SOUL.md").write_text(
@@ -225,41 +226,144 @@ class TestWebServerEndpoints:
             encoding="utf-8",
         )
 
-        workspace = tmp_path / "workspace"
-        workspace.mkdir()
-        (workspace / "AGENTS.md").write_text(
-            "# Project instructions\n\nAlways validate dashboard changes with tests.",
+        preset_dir = hermes_home / "agents" / "lead-hunter"
+        preset_dir.mkdir(parents=True)
+        (preset_dir / "AGENT.json").write_text(
+            '{"name": "Lead Hunter", "slug": "lead-hunter", "emoji": "🎯", "role": "Evidence-first local SMB opportunity finder", "description": "Commercial lead-finding preset", "personality": "kawaii", "default_skills": ["local-business-opportunity-finder"]}',
+            encoding="utf-8",
+        )
+        (preset_dir / "SOUL.md").write_text(
+            "You are Lead Hunter.\n\nFind verified local SMB opportunities.",
+            encoding="utf-8",
+        )
+        (preset_dir / "AGENTS.md").write_text(
+            "# Preset instructions\n\nAlways validate dashboard changes with tests.",
             encoding="utf-8",
         )
 
-        monkeypatch.setattr(web_server, "get_hermes_home", lambda: hermes_home)
         monkeypatch.setattr(
             web_server,
             "load_config",
             lambda: {
                 "model": {"default": "openai/gpt-5", "provider": "openai"},
-                "display": {"personality": "kawaii"},
                 "agent": {
+                    "active_preset": "lead-hunter",
                     "personalities": {
                         "kawaii": "Friendly and concise.",
-                    }
+                    },
                 },
             },
         )
-        monkeypatch.chdir(workspace)
 
         resp = self.client.get("/api/agent/profile")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["name"] == "Hermes Agent"
-        assert data["role"] == "You are Hermes, an evidence-first dashboard copilot."
+        assert data["name"] == "Lead Hunter"
+        assert data["role"] == "Evidence-first local SMB opportunity finder"
+        assert data["current_preset"]["emoji"] == "🎯"
+        assert any(preset["slug"] == "default" and preset["emoji"] == "✨" for preset in data["presets"])
+        assert data["active_preset"] == "lead-hunter"
         assert data["active_personality"] == "kawaii"
         assert data["model"]["model"] == "openai/gpt-5"
-        assert data["source_map"]["soul"]["path"].endswith("SOUL.md")
-        assert "Keep explanations concise." in data["source_map"]["soul"]["content"]
-        assert "Project instructions" in data["source_map"]["agents"]["content"]
+        assert data["current_preset"]["default_skills"] == ["local-business-opportunity-finder"]
+        assert {preset["slug"] for preset in data["presets"]} == {"default", "lead-hunter"}
+        assert data["source_map"]["soul"]["path"].endswith("lead-hunter/SOUL.md")
+        assert "Find verified local SMB opportunities." in data["source_map"]["soul"]["content"]
+        assert "Preset instructions" in data["source_map"]["agents"]["content"]
         assert "Brussels-focused SMB lead generation" in data["source_map"]["user"]["content"]
         assert "verified weak digital presence" in data["source_map"]["memory"]["content"]
+
+    def test_create_activate_update_and_delete_agent_preset(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes-home"))
+        slug = "flight-tracker"
+
+        create_resp = self.client.post(
+            "/api/agents",
+            json={
+                "name": "Flight Tracker",
+                "slug": slug,
+                "emoji": "✈️",
+                "role": "Finder",
+                "goal": "Find leads",
+                "description": "Prospecting preset",
+                "personality": "concise",
+                "default_skills": ["local-business-opportunity-finder"],
+                "soul_content": "You are Flight Tracker.",
+                "agents_content": "Always verify leads.",
+            },
+        )
+        assert create_resp.status_code == 200
+        assert create_resp.json()["slug"] == slug
+        assert create_resp.json()["emoji"] == "✈️"
+
+        dup_resp = self.client.post(
+            "/api/agents",
+            json={
+                "name": "Flight Tracker",
+                "slug": slug,
+                "soul_content": "duplicate",
+            },
+        )
+        assert dup_resp.status_code == 409
+
+        activate_resp = self.client.post(f"/api/agents/{slug}/activate", json={})
+        assert activate_resp.status_code == 200
+        assert activate_resp.json()["active_preset"] == slug
+
+        profile_resp = self.client.get("/api/agent/profile")
+        assert profile_resp.status_code == 200
+        assert profile_resp.json()["active_preset"] == slug
+
+        update_resp = self.client.put(
+            f"/api/agents/{slug}",
+            json={
+                "name": "Flight Tracker",
+                "slug": slug,
+                "emoji": "🛫",
+                "role": "Finder",
+                "goal": "Find better leads",
+                "description": "Updated preset",
+                "personality": "concise",
+                "default_skills": ["local-business-opportunity-finder", "hermes-lead-hunter-setup"],
+                "soul_content": "You are Flight Tracker updated.",
+                "agents_content": "Always verify and score leads.",
+            },
+        )
+        assert update_resp.status_code == 200
+        assert update_resp.json()["goal"] == "Find better leads"
+        assert update_resp.json()["emoji"] == "🛫"
+        assert update_resp.json()["default_skills"] == ["local-business-opportunity-finder", "hermes-lead-hunter-setup"]
+
+        delete_default = self.client.delete("/api/agents/default")
+        assert delete_default.status_code == 400
+
+        delete_resp = self.client.delete(f"/api/agents/{slug}")
+        assert delete_resp.status_code == 200
+        assert delete_resp.json()["ok"] is True
+
+    def test_create_cron_job_accepts_agent_name(self, monkeypatch):
+        captured = {}
+
+        def fake_create_job(**kwargs):
+            captured.update(kwargs)
+            return {"id": "job123", "prompt": kwargs["prompt"], "schedule_display": kwargs["schedule"], "agent_name": kwargs.get("agent_name")}
+
+        monkeypatch.setattr("cron.jobs.create_job", fake_create_job)
+
+        resp = self.client.post(
+            "/api/cron/jobs",
+            json={
+                "prompt": "Do the thing",
+                "schedule": "every 2h",
+                "name": "Test job",
+                "deliver": "local",
+                "agent_name": "lead-hunter",
+            },
+        )
+
+        assert resp.status_code == 200
+        assert captured["agent_name"] == "lead-hunter"
+        assert resp.json()["agent_name"] == "lead-hunter"
 
     def test_get_env_vars(self):
         resp = self.client.get("/api/env")

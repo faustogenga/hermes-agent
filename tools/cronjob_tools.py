@@ -197,6 +197,7 @@ def _format_job(job: Dict[str, Any]) -> Dict[str, Any]:
         "name": job["name"],
         "skill": skills[0] if skills else None,
         "skills": skills,
+        "agent_name": job.get("agent_name"),
         "prompt_preview": prompt[:100] + "..." if len(prompt) > 100 else prompt,
         "model": job.get("model"),
         "provider": job.get("provider"),
@@ -229,6 +230,7 @@ def cronjob(
     include_disabled: bool = False,
     skill: Optional[str] = None,
     skills: Optional[List[str]] = None,
+    agent_name: Optional[str] = None,
     model: Optional[str] = None,
     provider: Optional[str] = None,
     base_url: Optional[str] = None,
@@ -267,6 +269,7 @@ def cronjob(
                 deliver=deliver,
                 origin=_origin_from_env(),
                 skills=canonical_skills,
+                agent_name=_normalize_optional_job_value(agent_name),
                 model=_normalize_optional_job_value(model),
                 provider=_normalize_optional_job_value(provider),
                 base_url=_normalize_optional_job_value(base_url, strip_trailing_slash=True),
@@ -347,6 +350,8 @@ def cronjob(
                 canonical_skills = _canonical_skills(skill, skills)
                 updates["skills"] = canonical_skills
                 updates["skill"] = canonical_skills[0] if canonical_skills else None
+            if agent_name is not None:
+                updates["agent_name"] = _normalize_optional_job_value(agent_name)
             if model is not None:
                 updates["model"] = _normalize_optional_job_value(model)
             if provider is not None:
@@ -438,7 +443,11 @@ Important safety rule: cron-run sessions should not recursively schedule more cr
             "skills": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Optional ordered list of skill names to load before executing the cron prompt. On update, pass an empty array to clear attached skills."
+                "description": "Optional ordered list of skills to load before executing the cron prompt"
+            },
+            "agent_name": {
+                "type": "string",
+                "description": "Optional agent preset slug to run the cron job as"
             },
             "model": {
                 "type": "object",
@@ -498,6 +507,7 @@ registry.register(
         include_disabled=args.get("include_disabled", True),
         skill=args.get("skill"),
         skills=args.get("skills"),
+        agent_name=args.get("agent_name"),
         model=_mo[1],
         provider=_mo[0] or args.get("provider"),
         base_url=args.get("base_url"),

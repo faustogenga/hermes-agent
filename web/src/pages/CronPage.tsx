@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Clock, Pause, Play, Plus, Trash2, Zap } from "lucide-react";
 import { api } from "@/lib/api";
-import type { CronJob } from "@/lib/api";
+import type { AgentPresetSummary, CronJob } from "@/lib/api";
 import { useToast } from "@/hooks/useToast";
 import { Toast } from "@/components/Toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,7 @@ const STATUS_VARIANT: Record<string, "success" | "warning" | "destructive"> = {
 
 export default function CronPage() {
   const [jobs, setJobs] = useState<CronJob[]>([]);
+  const [presets, setPresets] = useState<AgentPresetSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast, showToast } = useToast();
   const { t } = useI18n();
@@ -37,6 +38,7 @@ export default function CronPage() {
   const [schedule, setSchedule] = useState("");
   const [name, setName] = useState("");
   const [deliver, setDeliver] = useState("local");
+  const [agentName, setAgentName] = useState("default");
   const [creating, setCreating] = useState(false);
 
   const loadJobs = () => {
@@ -47,7 +49,15 @@ export default function CronPage() {
       .finally(() => setLoading(false));
   };
 
+  const loadPresets = () => {
+    api
+      .getAgents()
+      .then((data) => setPresets(data.presets))
+      .catch(() => setPresets([]));
+  };
+
   useEffect(() => {
+    loadPresets();
     loadJobs();
   }, []);
 
@@ -63,12 +73,14 @@ export default function CronPage() {
         schedule: schedule.trim(),
         name: name.trim() || undefined,
         deliver,
+        agent_name: agentName || "default",
       });
       showToast(t.common.create + " ✓", "success");
       setPrompt("");
       setSchedule("");
       setName("");
       setDeliver("local");
+      setAgentName("default");
       loadJobs();
     } catch (e) {
       showToast(`${t.config.failedToSave}: ${e}`, "error");
@@ -107,6 +119,16 @@ export default function CronPage() {
     try {
       await api.deleteCronJob(job.id);
       showToast(`${t.common.delete}: "${job.name || job.prompt.slice(0, 30)}"`, "success");
+      loadJobs();
+    } catch (e) {
+      showToast(`${t.status.error}: ${e}`, "error");
+    }
+  };
+
+  const handleReassignAgent = async (job: CronJob, nextAgentName: string) => {
+    try {
+      await api.updateCronJob(job.id, { agent_name: nextAgentName || "default" });
+      showToast(`Assigned to ${nextAgentName || "default"}`, "success");
       loadJobs();
     } catch (e) {
       showToast(`${t.status.error}: ${e}`, "error");
@@ -156,7 +178,7 @@ export default function CronPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="cron-schedule">{t.cron.schedule}</Label>
                 <Input
@@ -165,6 +187,19 @@ export default function CronPage() {
                   value={schedule}
                   onChange={(e) => setSchedule(e.target.value)}
                 />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="cron-agent">Agent preset</Label>
+                <Select
+                  id="cron-agent"
+                  value={agentName}
+                  onValueChange={(v) => setAgentName(v)}
+                >
+                  {(presets.length ? presets : [{ slug: "default", name: "Default" } as AgentPresetSummary]).map((preset) => (
+                    <SelectOption key={preset.slug} value={preset.slug}>{preset.name}</SelectOption>
+                  ))}
+                </Select>
               </div>
 
               <div className="grid gap-2">
@@ -220,6 +255,7 @@ export default function CronPage() {
                   <Badge variant={STATUS_VARIANT[job.state] ?? "secondary"}>
                     {job.state}
                   </Badge>
+                  <Badge variant="outline">agent: {job.agent_name || "default"}</Badge>
                   {job.deliver && job.deliver !== "local" && (
                     <Badge variant="outline">{job.deliver}</Badge>
                   )}
@@ -233,6 +269,13 @@ export default function CronPage() {
                   <span className="font-mono">{job.schedule_display}</span>
                   <span>{t.cron.last}: {formatTime(job.last_run_at)}</span>
                   <span>{t.cron.next}: {formatTime(job.next_run_at)}</span>
+                </div>
+                <div className="mt-2 max-w-xs">
+                  <Select value={job.agent_name || "default"} onValueChange={(value) => handleReassignAgent(job, value)}>
+                    {(presets.length ? presets : [{ slug: "default", name: "Default" } as AgentPresetSummary]).map((preset) => (
+                      <SelectOption key={`${job.id}-${preset.slug}`} value={preset.slug}>{preset.name}</SelectOption>
+                    ))}
+                  </Select>
                 </div>
                 {job.last_error && (
                   <p className="text-xs text-destructive mt-1">{job.last_error}</p>

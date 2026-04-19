@@ -1565,6 +1565,7 @@ from agent.skill_commands import (
     build_plan_path,
     build_preloaded_skills_prompt,
 )
+from agent.agent_presets import get_active_agent_slug, list_agent_presets, resolve_agent_preset
 
 _skill_commands = scan_skill_commands()
 
@@ -1686,6 +1687,7 @@ class HermesCLI:
         resume: str = None,
         checkpoints: bool = False,
         pass_session_id: bool = False,
+        agent_preset: str = None,
     ):
         """
         Initialize the Hermes CLI.
@@ -1826,6 +1828,10 @@ class HermesCLI:
             or CLI_CONFIG["agent"].get("system_prompt", "")
         )
         self.personalities = CLI_CONFIG["agent"].get("personalities", {})
+        self.agent_preset_slug = resolve_agent_preset(
+            agent_preset or get_active_agent_slug(CLI_CONFIG),
+            config=CLI_CONFIG,
+        ).slug
         
         # Ephemeral prefill messages (few-shot priming, never persisted)
         self.prefill_messages = _load_prefill_messages(
@@ -3020,6 +3026,7 @@ class HermesCLI:
                 checkpoints_enabled=self.checkpoints_enabled,
                 checkpoint_max_snapshots=self.checkpoint_max_snapshots,
                 pass_session_id=self.pass_session_id,
+                agent_preset=self.agent_preset_slug,
                 tool_progress_callback=self._on_tool_progress,
                 tool_start_callback=self._on_tool_start if self._inline_diffs_enabled else None,
                 tool_complete_callback=self._on_tool_complete if self._inline_diffs_enabled else None,
@@ -3887,6 +3894,7 @@ class HermesCLI:
             lines.append(f"Title: {title}")
         lines.extend([
             f"Model: {model} ({provider})",
+            f"Agent Preset: {self.agent_preset_slug}",
             f"Created: {created_at.strftime('%Y-%m-%d %H:%M')}",
             f"Last Activity: {updated_at.strftime('%Y-%m-%d %H:%M')}",
             f"Tokens: {total_tokens:,}",
@@ -4301,6 +4309,9 @@ class HermesCLI:
                     self.agent._todo_store = TodoStore()
                 except Exception:
                     pass
+            if hasattr(self.agent, "agent_preset"):
+                self.agent.agent_preset = resolve_agent_preset(self.agent_preset_slug, config=CLI_CONFIG)
+                self.agent.agent_preset_slug = self.agent.agent_preset.slug
             if hasattr(self.agent, "_invalidate_system_prompt"):
                 self.agent._invalidate_system_prompt()
 
@@ -5202,6 +5213,67 @@ class HermesCLI:
             print()
             print("  Usage: /personality <name>")
             print()
+
+    def _handle_agent_command(self, cmd: str):
+        """Handle /agent, /agent list, /agent use <slug>, and /agent show."""
+        parts = cmd.split()
+        subcommand = parts[1].lower() if len(parts) > 1 else "show"
+        presets = list_agent_presets()
+        active_slug = self.agent_preset_slug
+
+        if subcommand == "list":
+            print()
+            print("Available agent presets:")
+            print("-" * 60)
+            for preset in presets:
+                marker = " ← active" if preset.slug == active_slug else ""
+                built_in = " (built-in)" if preset.built_in else ""
+                summary = preset.description or preset.role or "No description"
+                print(f"  {preset.slug}{built_in}{marker}")
+                print(f"    {preset.name} — {summary}")
+            print()
+            return
+
+        if subcommand == "show":
+            preset = resolve_agent_preset(active_slug, config=CLI_CONFIG)
+            print()
+            print(f"Active agent preset: {preset.slug}")
+            print(f"  Name: {preset.name}")
+            if preset.role:
+                print(f"  Role: {preset.role}")
+            if preset.goal:
+                print(f"  Goal: {preset.goal}")
+            if preset.description:
+                print(f"  Description: {preset.description}")
+            if preset.personality:
+                print(f"  Personality: {preset.personality}")
+            if preset.default_skills:
+                print(f"  Default skills: {', '.join(preset.default_skills)}")
+            print()
+            return
+
+        if subcommand == "use":
+            if len(parts) < 3:
+                print("(._.) Usage: /agent use <slug>")
+                return
+            target_slug = parts[2].strip().lower()
+            available = {preset.slug for preset in presets}
+            if target_slug not in available:
+                print(f"(._.) Unknown agent preset: {target_slug}")
+                print(f"  Available: {', '.join(sorted(available))}")
+                return
+            self.agent_preset_slug = target_slug
+            if save_config_value("agent.active_preset", target_slug):
+                print(f"(^_^)b Agent preset set to '{target_slug}' (saved to config)")
+            else:
+                print(f"(^_^) Agent preset set to '{target_slug}' (session only)")
+            if self.agent or self.conversation_history:
+                print("  This applies to new prompt builds only. Use /new or /clear to start a fresh session with the new preset.")
+            else:
+                print("  Ready — the next session initialization will use this preset.")
+            return
+
+        print("(._.) Usage: /agent [list|show|use <slug>]")
     
     def _handle_cron_command(self, cmd: str):
         """Handle the /cron command to manage scheduled tasks."""
@@ -5673,6 +5745,8 @@ class HermesCLI:
         elif canonical == "personality":
             # Use original case (handler lowercases the personality name itself)
             self._handle_personality_command(cmd_original)
+        elif canonical == "agent":
+            self._handle_agent_command(cmd_original)
         elif canonical == "plan":
             self._handle_plan_command(cmd_original)
         elif canonical == "retry":
@@ -5992,6 +6066,7 @@ class HermesCLI:
                     provider_require_parameters=self._provider_require_params,
                     provider_data_collection=self._provider_data_collection,
                     fallback_model=self._fallback_model,
+                    agent_preset=self.agent_preset_slug,
                 )
                 # Silence raw spinner; route thinking through TUI widget when no foreground agent is active.
                 bg_agent._print_fn = lambda *_a, **_kw: None
@@ -10309,6 +10384,7 @@ def main(
     image: str = None,
     toolsets: str = None,
     skills: str | list[str] | tuple[str, ...] = None,
+    agent_preset: str = None,
     model: str = None,
     provider: str = None,
     api_key: str = None,
@@ -10335,6 +10411,7 @@ def main(
         image: Optional local image path to attach to a single query
         toolsets: Comma-separated list of toolsets to enable (e.g., "web,terminal")
         skills: Comma-separated or repeated list of skills to preload for the session
+        agent_preset: Agent preset slug to use for the session
         model: Model to use (default: anthropic/claude-opus-4-20250514)
         provider: Inference provider ("auto", "openrouter", "nous", "openai-codex", "zai", "kimi-coding", "minimax", "minimax-cn")
         api_key: API key for authentication
@@ -10434,6 +10511,7 @@ def main(
         resume=resume,
         checkpoints=checkpoints,
         pass_session_id=pass_session_id,
+        agent_preset=agent_preset,
     )
 
     if parsed_skills:

@@ -374,6 +374,7 @@ def create_job(
     origin: Optional[Dict[str, Any]] = None,
     skill: Optional[str] = None,
     skills: Optional[List[str]] = None,
+    agent_name: Optional[str] = None,
     model: Optional[str] = None,
     provider: Optional[str] = None,
     base_url: Optional[str] = None,
@@ -419,6 +420,7 @@ def create_job(
     now = _hermes_now().isoformat()
 
     normalized_skills = _normalize_skill_list(skill, skills)
+    normalized_agent_name = str(agent_name).strip() if isinstance(agent_name, str) else None
     normalized_model = str(model).strip() if isinstance(model, str) else None
     normalized_provider = str(provider).strip() if isinstance(provider, str) else None
     normalized_base_url = str(base_url).strip().rstrip("/") if isinstance(base_url, str) else None
@@ -435,6 +437,7 @@ def create_job(
         "prompt": prompt,
         "skills": normalized_skills,
         "skill": normalized_skills[0] if normalized_skills else None,
+        "agent_name": normalized_agent_name or None,
         "model": normalized_model,
         "provider": normalized_provider,
         "base_url": normalized_base_url,

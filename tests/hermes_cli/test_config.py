@@ -65,6 +65,7 @@ class TestLoadConfigDefaults:
         with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
             config = load_config()
             assert config["model"] == DEFAULT_CONFIG["model"]
+            assert config["agent"]["active_preset"] == "default"
             assert config["agent"]["max_turns"] == DEFAULT_CONFIG["agent"]["max_turns"]
             assert "max_turns" not in config
             assert "terminal" in config
@@ -86,14 +87,17 @@ class TestSaveAndLoadRoundtrip:
         with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
             config = load_config()
             config["model"] = "test/custom-model"
+            config["agent"]["active_preset"] = "lead-hunter"
             config["agent"]["max_turns"] = 42
             save_config(config)
 
             reloaded = load_config()
             assert reloaded["model"] == "test/custom-model"
+            assert reloaded["agent"]["active_preset"] == "lead-hunter"
             assert reloaded["agent"]["max_turns"] == 42
 
             saved = yaml.safe_load((tmp_path / "config.yaml").read_text())
+            assert saved["agent"]["active_preset"] == "lead-hunter"
             assert saved["agent"]["max_turns"] == 42
             assert "max_turns" not in saved
 

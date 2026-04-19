@@ -9,6 +9,12 @@ export interface PluginManifest {
   tab: {
     path: string;
     position: string;  // "end", "after:<tab>", "before:<tab>"
+    hidden?: boolean;
+  };
+  agentPage?: {
+    slug: string;
+    path: string;
+    label: string;
   };
   entry: string;
   css?: string | null;

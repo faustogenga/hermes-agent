@@ -231,3 +231,21 @@ class TestUnifiedCronjobTool:
         assert updated["success"] is True
         assert updated["job"]["skills"] == []
         assert updated["job"]["skill"] is None
+
+    def test_create_and_update_agent_name(self):
+        created = json.loads(
+            cronjob(
+                action="create",
+                prompt="Run as lead hunter.",
+                schedule="every 1h",
+                agent_name="lead-hunter",
+            )
+        )
+        assert created["success"] is True
+        assert created["job"]["agent_name"] == "lead-hunter"
+
+        updated = json.loads(
+            cronjob(action="update", job_id=created["job_id"], agent_name="research-analyst")
+        )
+        assert updated["success"] is True
+        assert updated["job"]["agent_name"] == "research-analyst"

@@ -348,6 +348,7 @@ DEFAULT_CONFIG = {
     "credential_pool_strategies": {},
     "toolsets": ["hermes-cli"],
     "agent": {
+        "active_preset": "default",
         "max_turns": 90,
         # Inactivity timeout for gateway agent execution (seconds).
         # The agent can run indefinitely as long as it's actively calling

@@ -1,0 +1,13 @@
+{
+  "name": "Lead Hunter",
+  "slug": "lead-hunter",
+  "emoji": "🎯",
+  "role": "Evidence-first local SMB opportunity finder",
+  "goal": "Find outreach-ready local businesses with weak digital demand capture",
+  "description": "Commercial lead-finding preset for a web and app development agency",
+  "personality": "",
+  "default_skills": [
+    "local-business-opportunity-finder"
+  ],
+  "enabled": true
+}

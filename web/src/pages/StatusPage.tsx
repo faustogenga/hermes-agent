@@ -10,7 +10,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import type { PlatformStatus, SessionInfo, StatusResponse } from "@/lib/api";
+import type { AgentProfileResponse, PlatformStatus, SessionInfo, StatusResponse } from "@/lib/api";
 import { timeAgo, isoTimeAgo } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ import { useI18n } from "@/i18n";
 
 export default function StatusPage() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
+  const [agentProfile, setAgentProfile] = useState<AgentProfileResponse | null>(null);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const { t } = useI18n();
 
@@ -25,6 +26,7 @@ export default function StatusPage() {
     const load = () => {
       api.getStatus().then(setStatus).catch(() => {});
       api.getSessions(50).then((resp) => setSessions(resp.sessions)).catch(() => {});
+      api.getAgentProfile().then(setAgentProfile).catch(() => {});
     };
     load();
     const interval = setInterval(load, 5000);
@@ -162,6 +164,29 @@ export default function StatusPage() {
 
       {platforms.length > 0 && (
         <PlatformsCard platforms={platforms} platformStateBadge={PLATFORM_STATE_BADGE} />
+      )}
+
+      {agentProfile && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Database className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-base">Shared context</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-4 lg:grid-cols-2">
+            <div className="border border-border p-3">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">USER.md</div>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{agentProfile.source_map.user?.summary || "No saved user profile yet."}</p>
+              <p className="mt-2 text-xs text-muted-foreground/70">Global user preferences shared across all presets.</p>
+            </div>
+            <div className="border border-border p-3">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">MEMORY.md</div>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{agentProfile.source_map.memory?.summary || "No saved agent memory yet."}</p>
+              <p className="mt-2 text-xs text-muted-foreground/70">Global durable notes for the install, shared across presets.</p>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {activeSessions.length > 0 && (

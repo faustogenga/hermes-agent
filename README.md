@@ -74,6 +74,7 @@ Hermes has two entry points: start the terminal UI with `hermes`, or run the gat
 | Start fresh conversation | `/new` or `/reset` | `/new` or `/reset` |
 | Change model | `/model [provider:model]` | `/model [provider:model]` |
 | Set a personality | `/personality [name]` | `/personality [name]` |
+| Show or switch agent preset | `/agent`, `/agent list`, `/agent use <slug>` | n/a |
 | Retry or undo the last turn | `/retry`, `/undo` | `/retry`, `/undo` |
 | Compress context / check usage | `/compress`, `/usage`, `/insights [--days N]` | `/compress`, `/usage`, `/insights [days]` |
 | Browse skills | `/skills` or `/<skill-name>` | `/skills` or `/<skill-name>` |
@@ -100,6 +101,7 @@ All documentation lives at **[hermes-agent.nousresearch.com/docs](https://hermes
 | [Memory](https://hermes-agent.nousresearch.com/docs/user-guide/features/memory) | Persistent memory, user profiles, best practices |
 | [MCP Integration](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp) | Connect any MCP server for extended capabilities |
 | [Cron Scheduling](https://hermes-agent.nousresearch.com/docs/user-guide/features/cron) | Scheduled tasks with platform delivery |
+| `docs/agent-presets.md` | Profiles vs presets, CLI usage, cron `agent_name`, built-in lead-hunter |
 | [Context Files](https://hermes-agent.nousresearch.com/docs/user-guide/features/context-files) | Project context that shapes every conversation |
 | [Architecture](https://hermes-agent.nousresearch.com/docs/developer-guide/architecture) | Project structure, agent loop, key classes |
 | [Contributing](https://hermes-agent.nousresearch.com/docs/developer-guide/contributing) | Development setup, PR process, code style |

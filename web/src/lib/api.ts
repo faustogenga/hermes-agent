@@ -59,6 +59,27 @@ export const api = {
   getSchema: () => fetchJSON<{ fields: Record<string, unknown>; category_order: string[] }>("/api/config/schema"),
   getModelInfo: () => fetchJSON<ModelInfoResponse>("/api/model/info"),
   getAgentProfile: () => fetchJSON<AgentProfileResponse>("/api/agent/profile"),
+  getAgents: () => fetchJSON<{ active_preset: string; presets: AgentPresetSummary[]; available_personalities: string[] }>("/api/agents"),
+  createAgent: (agent: AgentPresetUpsertPayload) =>
+    fetchJSON<AgentPresetDetail>("/api/agents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(agent),
+    }),
+  updateAgent: (slug: string, agent: AgentPresetUpsertPayload) =>
+    fetchJSON<AgentPresetDetail>(`/api/agents/${encodeURIComponent(slug)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(agent),
+    }),
+  activateAgent: (slug: string) =>
+    fetchJSON<{ ok: boolean; active_preset: string }>(`/api/agents/${encodeURIComponent(slug)}/activate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug }),
+    }),
+  deleteAgent: (slug: string) =>
+    fetchJSON<{ ok: boolean }>(`/api/agents/${encodeURIComponent(slug)}`, { method: "DELETE" }),
   saveConfig: (config: Record<string, unknown>) =>
     fetchJSON<{ ok: boolean }>("/api/config", {
       method: "PUT",
@@ -99,11 +120,17 @@ export const api = {
 
   // Cron jobs
   getCronJobs: () => fetchJSON<CronJob[]>("/api/cron/jobs"),
-  createCronJob: (job: { prompt: string; schedule: string; name?: string; deliver?: string }) =>
+  createCronJob: (job: { prompt: string; schedule: string; name?: string; deliver?: string; agent_name?: string }) =>
     fetchJSON<CronJob>("/api/cron/jobs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(job),
+    }),
+  updateCronJob: (id: string, updates: Record<string, unknown>) =>
+    fetchJSON<CronJob>(`/api/cron/jobs/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updates }),
     }),
   pauseCronJob: (id: string) =>
     fetchJSON<{ ok: boolean }>(`/api/cron/jobs/${id}/pause`, { method: "POST" }),
@@ -324,6 +351,7 @@ export interface CronJob {
   enabled: boolean;
   state: string;
   deliver?: string;
+  agent_name?: string | null;
   last_run_at?: string | null;
   next_run_at?: string | null;
   last_error?: string | null;
@@ -385,12 +413,52 @@ export interface AgentProfileSource {
   content: string;
 }
 
+export interface AgentPresetSummary {
+  name: string;
+  slug: string;
+  emoji: string;
+  role: string;
+  goal: string;
+  description: string;
+  personality: string;
+  personality_prompt: string;
+  default_skills: string[];
+  built_in: boolean;
+  active: boolean;
+  soul_path?: string | null;
+  agents_path?: string | null;
+  metadata_path?: string | null;
+}
+
+export interface AgentPresetDetail extends AgentPresetSummary {
+  soul_content: string;
+  agents_content: string;
+}
+
+export interface AgentPresetUpsertPayload {
+  name: string;
+  slug?: string;
+  emoji: string;
+  role: string;
+  goal: string;
+  description: string;
+  personality: string;
+  default_skills: string[];
+  soul_content: string;
+  agents_content: string;
+}
+
 export interface AgentProfileResponse {
   name: string;
   role: string;
   description: string;
+  active_preset: string;
   active_personality: string;
   personality_prompt: string;
+  current_preset: AgentPresetDetail;
+  presets: AgentPresetDetail[];
+  available_personalities: string[];
+  cron_examples: Array<{ name: string; payload: Record<string, unknown> }>;
   model: ModelInfoResponse;
   sources: AgentProfileSource[];
   source_map: Record<string, AgentProfileSource>;
@@ -469,7 +537,8 @@ export interface PluginManifestResponse {
   description: string;
   icon: string;
   version: string;
-  tab: { path: string; position: string };
+  tab: { path: string; position: string; hidden?: boolean };
+  agentPage?: { slug: string; path: string; label: string };
   entry: string;
   css?: string | null;
   has_api: boolean;

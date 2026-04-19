@@ -95,6 +95,8 @@ from agent.context_compressor import ContextCompressor
 from agent.subdirectory_hints import SubdirectoryHintTracker
 from agent.prompt_caching import apply_anthropic_cache_control
 from agent.prompt_builder import build_skills_system_prompt, build_context_files_prompt, build_environment_hints, load_soul_md, TOOL_USE_ENFORCEMENT_GUIDANCE, TOOL_USE_ENFORCEMENT_MODELS, DEVELOPER_ROLE_MODELS, GOOGLE_MODEL_OPERATIONAL_GUIDANCE, OPENAI_MODEL_EXECUTION_GUIDANCE
+from agent.skill_commands import build_preloaded_skills_prompt
+from agent.agent_presets import resolve_agent_preset
 from agent.usage_pricing import estimate_usage_cost, normalize_usage
 from agent.display import (
     KawaiiSpinner, build_tool_preview as _build_tool_preview,
@@ -651,6 +653,7 @@ class AIAgent:
         gateway_session_key: str = None,
         skip_context_files: bool = False,
         skip_memory: bool = False,
+        agent_preset: str = None,
         session_db=None,
         parent_session_id: str = None,
         iteration_budget: "IterationBudget" = None,
@@ -727,6 +730,10 @@ class AIAgent:
         self.skip_context_files = skip_context_files
         self.pass_session_id = pass_session_id
         self.persist_session = persist_session
+        self.agent_preset = resolve_agent_preset(agent_preset)
+        self.agent_preset_slug = self.agent_preset.slug
+        self._preset_skills_prompt = ""
+        self._preset_loaded_skills: list[str] = []
         self._credential_pool = credential_pool
         self.log_prefix_chars = log_prefix_chars
         self.log_prefix = f"{log_prefix} " if log_prefix else ""
@@ -3655,7 +3662,7 @@ class AIAgent:
         # Try SOUL.md as primary identity (unless context files are skipped)
         _soul_loaded = False
         if not self.skip_context_files:
-            _soul_content = load_soul_md()
+            _soul_content = load_soul_md(agent_preset=self.agent_preset)
             if _soul_content:
                 prompt_parts = [_soul_content]
                 _soul_loaded = True
@@ -3738,6 +3745,18 @@ class AIAgent:
             except Exception:
                 pass
 
+        self._preset_skills_prompt = ""
+        self._preset_loaded_skills = []
+        if self.agent_preset.default_skills:
+            preset_skills_prompt, loaded_skills, _missing_skills = build_preloaded_skills_prompt(
+                self.agent_preset.default_skills,
+                task_id=self.session_id,
+            )
+            if preset_skills_prompt:
+                self._preset_skills_prompt = preset_skills_prompt
+                self._preset_loaded_skills = loaded_skills
+                prompt_parts.append(preset_skills_prompt)
+
         has_skills_tools = any(name in self.valid_tool_names for name in ['skills_list', 'skill_view', 'skill_manage'])
         if has_skills_tools:
             avail_toolsets = {
@@ -3763,7 +3782,10 @@ class AIAgent:
             # other dev files — inflating token usage by ~10k for no benefit.
             _context_cwd = os.getenv("TERMINAL_CWD") or None
             context_files_prompt = build_context_files_prompt(
-                cwd=_context_cwd, skip_soul=_soul_loaded)
+                cwd=_context_cwd,
+                skip_soul=_soul_loaded,
+                agent_preset=self.agent_preset,
+            )
             if context_files_prompt:
                 prompt_parts.append(context_files_prompt)
 
