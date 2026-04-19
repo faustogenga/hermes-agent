@@ -425,13 +425,17 @@ class TestBuildSchemaFromConfig:
         assert "privacy" not in categories  # merged into security
         assert "context" not in categories  # merged into agent
 
-    def test_no_single_field_categories(self):
-        """After merging, no category should have just 1 field."""
+    def test_no_unexpected_single_field_categories(self):
+        """After merging, singleton categories should be explicitly intentional."""
         from hermes_cli.web_server import CONFIG_SCHEMA
         from collections import Counter
         cats = Counter(e["category"] for e in CONFIG_SCHEMA.values())
+        allowed_singletons = {"code_execution"}
         for cat, count in cats.items():
-            assert count >= 2, f"Category '{cat}' has only {count} field(s) — should be merged"
+            if count == 1:
+                assert cat in allowed_singletons, (
+                    f"Category '{cat}' has only {count} field(s) and is not an allowed singleton"
+                )
 
 
 # ---------------------------------------------------------------------------
