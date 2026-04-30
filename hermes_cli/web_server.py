@@ -959,8 +959,6 @@ async def create_agent(body: AgentPresetPayload):
 @app.put("/api/agents/{slug}")
 async def update_agent(slug: str, body: AgentPresetPayload):
     normalized = re.sub(r"[^a-z0-9]+", "-", slug.lower()).strip("-") or "default"
-    if normalized == "default":
-        raise HTTPException(status_code=400, detail="The built-in default preset is read-only")
     try:
         preset = save_agent_preset(
             normalized,

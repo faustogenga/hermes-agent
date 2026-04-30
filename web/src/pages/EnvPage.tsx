@@ -56,7 +56,8 @@ const PROVIDER_GROUPS: { prefix: string; name: string; priority: number }[] = [
   { prefix: "OPENCODE_GO_",     name: "OpenCode Go",       priority: 13 },
   { prefix: "OPENCODE_ZEN_",    name: "OpenCode Zen",      priority: 14 },
   { prefix: "OPENROUTER_",      name: "OpenRouter",        priority: 15 },
-  { prefix: "XIAOMI_",          name: "Xiaomi MiMo",       priority: 16 },
+  { prefix: "THE_ODDS_",        name: "The Odds API",      priority: 16 },
+  { prefix: "XIAOMI_",          name: "Xiaomi MiMo",       priority: 17 },
 ];
 
 function getProviderGroup(key: string): string {

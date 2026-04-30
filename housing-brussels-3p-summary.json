@@ -1,0 +1,12 @@
+{
+  "run_key": "housing-brussels-3p:2026-04-28T13:33:43Z",
+  "recorded_at": "2026-04-28T13:33:43Z",
+  "job_name": "housing-brussels-3p",
+  "table_name": "Housing Brussels 3p",
+  "household_size": 3,
+  "reviewed_count": 22,
+  "new_count": 5,
+  "sent_count": 3,
+  "summary_message": "Brussels housing 3p: 5 strong options\n• Merode/Schuman — €1200/mo — 2br — Now — 8.8/10\n• Yser/Sainte-Catherine — €1350/mo — 2br — Jul — 8.6/10\n• EU District — €1700/mo — 2br — Unk — 8.5/10\nAirtable: ok | Sources: Immovlan | Blocker: Immoweb/Facebook blocked; 3br scarce",
+  "blocker": "Immoweb/Facebook blocked; 3br scarce"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "Flight Finder",
+  "slug": "flight-finder",
+  "emoji": "✈️",
+  "role": "Evidence-first airfare tracker and deal watcher",
+  "goal": "Monitor specific routes, surface the best grounded fare options, and keep a clean historical record for comparison over time",
+  "description": "Flight-monitoring preset optimized for Google Flights first, corroborated backup checks, and structured Airtable tracking.",
+  "personality": "flight-finder",
+  "default_skills": [
+    "flight-fare-monitoring"
+  ],
+  "enabled": true
+}

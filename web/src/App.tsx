@@ -34,11 +34,11 @@ interface NavItem {
 
 const BUILTIN_NAV: NavItem[] = [
   { path: "/", labelKey: "status", label: "Status", icon: Activity },
-  { path: "/agent", label: "Agent", icon: Bot },
+  { path: "/agent", label: "Agents", icon: Bot },
+  { path: "/cron", labelKey: "cron", label: "Cron", icon: Clock },
   { path: "/sessions", labelKey: "sessions", label: "Sessions", icon: MessageSquare },
   { path: "/analytics", labelKey: "analytics", label: "Analytics", icon: BarChart3 },
   { path: "/logs", labelKey: "logs", label: "Logs", icon: FileText },
-  { path: "/cron", labelKey: "cron", label: "Cron", icon: Clock },
   { path: "/skills", labelKey: "skills", label: "Skills", icon: Package },
   { path: "/config", labelKey: "config", label: "Config", icon: Settings },
   { path: "/env", labelKey: "keys", label: "Keys", icon: KeyRound },

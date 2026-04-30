@@ -16,7 +16,7 @@ def test_list_agent_presets_returns_default_when_none_exist(monkeypatch, tmp_pat
 
     presets = list_agent_presets()
 
-    assert [preset.slug for preset in presets] == ["default", "lead-hunter"]
+    assert [preset.slug for preset in presets] == ["default", "flight-finder", "lead-hunter"]
     assert presets[0].built_in is True
     assert presets[0].soul_path == tmp_path / "SOUL.md"
     assert presets[1].built_in is True
@@ -53,7 +53,7 @@ def test_invalid_preset_is_skipped_safely(monkeypatch, tmp_path):
 
     presets = list_agent_presets()
 
-    assert [preset.slug for preset in presets] == ["default", "lead-hunter"]
+    assert [preset.slug for preset in presets] == ["default", "flight-finder", "lead-hunter"]
 
 
 
@@ -82,12 +82,15 @@ def test_builtin_lead_hunter_preset_is_available_without_user_writes(monkeypatch
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
 
     preset = load_agent_preset("lead-hunter")
+    soul = read_agent_preset_source(preset.soul_path)
 
     assert preset.slug == "lead-hunter"
     assert preset.built_in is True
     assert preset.default_skills == ["local-business-opportunity-finder"]
     assert preset.emoji == "🎯"
-    assert "Lead Hunter" in read_agent_preset_source(preset.soul_path)
+    assert "Lead Hunter" in soul
+    assert "Opportunity Score" in soul
+    assert load_agent_preset("flight-finder").default_skills == ["flight-fare-monitoring"]
     assert not (tmp_path / "agents" / "lead-hunter").exists()
 
 
@@ -108,6 +111,35 @@ def test_custom_preset_overrides_builtin_template(monkeypatch, tmp_path):
     assert loaded.built_in is False
     assert loaded.default_skills == ["hermes-lead-hunter-setup"]
     assert read_agent_preset_source(loaded.soul_path) == "Custom lead hunter soul.\n"
+
+
+def test_saving_default_preset_updates_root_soul_and_metadata(monkeypatch, tmp_path):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+
+    saved = save_agent_preset(
+        "default",
+        metadata={
+            "name": "Default",
+            "emoji": "👑",
+            "role": "Updated main assistant",
+            "goal": "Ship code and help everywhere",
+            "description": "Updated default preset",
+            "personality": "focused",
+            "default_skills": ["plan", "systematic-debugging"],
+        },
+        soul_content="You are the updated default assistant.",
+        agents_content="Always verify before shipping.",
+    )
+
+    loaded = load_agent_preset("default")
+
+    assert saved.slug == "default"
+    assert loaded.emoji == "👑"
+    assert loaded.role == "Updated main assistant"
+    assert loaded.default_skills == ["plan", "systematic-debugging"]
+    assert read_agent_preset_source(loaded.soul_path) == "You are the updated default assistant.\n"
+    assert read_agent_preset_source(loaded.agents_path) == "Always verify before shipping.\n"
+    assert loaded.agents_path == tmp_path / "agents" / "default" / "AGENTS.md"
 
 
 def test_deleting_custom_override_restores_builtin_template(monkeypatch, tmp_path):

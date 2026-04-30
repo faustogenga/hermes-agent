@@ -266,7 +266,8 @@ class TestWebServerEndpoints:
         assert data["active_personality"] == "kawaii"
         assert data["model"]["model"] == "openai/gpt-5"
         assert data["current_preset"]["default_skills"] == ["local-business-opportunity-finder"]
-        assert {preset["slug"] for preset in data["presets"]} == {"default", "lead-hunter"}
+        assert {preset["slug"] for preset in data["presets"]} == {"default", "lead-hunter", "flight-finder"}
+        assert next(preset for preset in data["presets"] if preset["slug"] == "flight-finder")["default_skills"] == ["flight-fare-monitoring"]
         assert data["source_map"]["soul"]["path"].endswith("lead-hunter/SOUL.md")
         assert "Find verified local SMB opportunities." in data["source_map"]["soul"]["content"]
         assert "Preset instructions" in data["source_map"]["agents"]["content"]
@@ -334,6 +335,26 @@ class TestWebServerEndpoints:
         assert update_resp.json()["emoji"] == "🛫"
         assert update_resp.json()["default_skills"] == ["local-business-opportunity-finder", "hermes-lead-hunter-setup"]
 
+        default_update = self.client.put(
+            "/api/agents/default",
+            json={
+                "name": "Default",
+                "slug": "default",
+                "emoji": "👑",
+                "role": "Updated main assistant",
+                "goal": "Help across everything",
+                "description": "Updated default preset",
+                "personality": "focused",
+                "default_skills": ["plan"],
+                "soul_content": "You are the updated default assistant.",
+                "agents_content": "Always verify before shipping.",
+            },
+        )
+        assert default_update.status_code == 200
+        assert default_update.json()["slug"] == "default"
+        assert default_update.json()["emoji"] == "👑"
+        assert default_update.json()["role"] == "Updated main assistant"
+
         delete_default = self.client.delete("/api/agents/default")
         assert delete_default.status_code == 400
 
@@ -373,11 +394,13 @@ class TestWebServerEndpoints:
         assert any(k.endswith("_API_KEY") or k.endswith("_TOKEN") for k in data.keys())
         assert "HUNTER_API_KEY" in data
         assert "APOLLO_API_KEY" in data
+        assert "THE_ODDS_API_KEY" in data
         assert "GITHUB_TOKEN" in data
         assert "GH_TOKEN" in data
         assert "COPILOT_GITHUB_TOKEN" in data
         assert data["HUNTER_API_KEY"]["category"] == "tool"
         assert data["APOLLO_API_KEY"]["category"] == "tool"
+        assert data["THE_ODDS_API_KEY"]["category"] == "provider"
         assert data["GITHUB_TOKEN"]["category"] == "tool"
         assert data["GH_TOKEN"]["category"] == "tool"
         assert data["COPILOT_GITHUB_TOKEN"]["category"] == "tool"

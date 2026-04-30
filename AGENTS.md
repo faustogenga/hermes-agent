@@ -19,6 +19,7 @@ Dashboard expectations tied to this specialization:
 - the Keys page should expose Hunter and Apollo credentials when configured in `OPTIONAL_ENV_VARS`
 - the Agent page should make the active SOUL/personality visible so users can confirm the business-finder persona is loaded
 - changes that affect dashboard UI must be rebuilt into `hermes_cli/web_dist/`
+- for this checkout, do not proactively run manual/browser QA after UI changes unless the user explicitly asks; prefer code changes plus minimal non-manual verification and let the user test interactively
 
 ## Development Environment
 

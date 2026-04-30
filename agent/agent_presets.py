@@ -72,21 +72,36 @@ def _normalize_skill_list(raw: Any) -> list[str]:
     return normalized
 
 
+def _default_override_dir() -> Path:
+    return get_agent_presets_dir() / _DEFAULT_SLUG
+
+
 def get_default_agent_preset() -> AgentPreset:
     hermes_home = get_hermes_home()
     soul_path = hermes_home / "SOUL.md"
+    override_dir = _default_override_dir()
+    metadata_path = override_dir / "AGENT.json"
+    agents_path = override_dir / "AGENTS.md"
+    metadata: dict[str, Any] = {}
+    if metadata_path.exists():
+        try:
+            loaded = json.loads(metadata_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                metadata = loaded
+        except Exception:
+            metadata = {}
     return AgentPreset(
-        name="Default",
+        name=str(metadata.get("name") or "Default"),
         slug=_DEFAULT_SLUG,
-        emoji="✨",
-        role="Primary Hermes assistant",
-        goal="Be an excellent general-purpose AI assistant for coding, development, research, operations, writing, and execution across the user’s work",
-        description="Built-in general-purpose preset mapped to the root SOUL.md behavior.",
-        personality="",
-        default_skills=[],
+        emoji=str(metadata.get("emoji") or "✨"),
+        role=str(metadata.get("role") or "Primary Hermes assistant"),
+        goal=str(metadata.get("goal") or "Be an excellent general-purpose AI assistant for coding, development, research, operations, writing, and execution across the user’s work"),
+        description=str(metadata.get("description") or "Built-in general-purpose preset mapped to the root SOUL.md behavior."),
+        personality=str(metadata.get("personality") or ""),
+        default_skills=_normalize_skill_list(metadata.get("default_skills")),
         soul_path=soul_path,
-        agents_path=None,
-        metadata_path=None,
+        agents_path=agents_path if agents_path.exists() else None,
+        metadata_path=metadata_path if metadata_path.exists() else None,
         built_in=True,
     )
 
@@ -232,7 +247,27 @@ def save_agent_preset(
 ) -> AgentPreset:
     normalized_slug = slugify_agent_name(slug or metadata.get("slug") or metadata.get("name") or "")
     if normalized_slug == _DEFAULT_SLUG:
-        raise ValueError("The built-in default preset cannot be stored under ~/.hermes/agents/default")
+        hermes_home = get_hermes_home()
+        preset_dir = _default_override_dir()
+        preset_dir.mkdir(parents=True, exist_ok=True)
+        metadata_path = preset_dir / "AGENT.json"
+        agents_path = preset_dir / "AGENTS.md"
+        soul_path = hermes_home / "SOUL.md"
+        payload = {
+            "name": str(metadata.get("name") or "Default"),
+            "slug": _DEFAULT_SLUG,
+            "emoji": str(metadata.get("emoji") or "✨"),
+            "role": str(metadata.get("role") or ""),
+            "goal": str(metadata.get("goal") or ""),
+            "description": str(metadata.get("description") or ""),
+            "personality": str(metadata.get("personality") or ""),
+            "default_skills": _normalize_skill_list(metadata.get("default_skills")),
+            "enabled": True,
+        }
+        metadata_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        _write_text_if_present(soul_path, soul_content)
+        _write_text_if_present(agents_path, agents_content)
+        return load_agent_preset(_DEFAULT_SLUG)
     preset_dir = _preset_dir_for_slug(normalized_slug)
     preset_dir.mkdir(parents=True, exist_ok=True)
     metadata_path = preset_dir / "AGENT.json"

@@ -1,0 +1,12 @@
+{
+  "run_key": "housing-brussels-3p:2026-04-28T13:33:43Z",
+  "recorded_at": "2026-04-28T13:33:43Z",
+  "job_name": "housing-brussels-3p",
+  "table_name": "Housing Brussels 3p",
+  "household_size": 3,
+  "attempted_sources": ["Immoweb", "Immovlan", "Zimmo", "HousingAnywhere", "Facebook Marketplace", "Spotahome", "Trovit", "Rentola", "Appartager"],
+  "accessible_sources": ["Immovlan", "Spotahome", "Rentola"],
+  "shortlisted_sources": ["Immovlan"],
+  "blocked_sources": ["Immoweb", "Zimmo", "HousingAnywhere", "Facebook Marketplace", "Trovit", "Appartager"],
+  "coverage_notes": "Immovlan produced the strongest grounded long-term matches; Spotahome skewed 3-month inventory and Rentola was weaker/less explicit on lease details."
+}

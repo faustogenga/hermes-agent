@@ -127,6 +127,19 @@ code {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+@keyframes agent-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes agent-bob {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-3px) scale(1.03); }
+}
+@keyframes footstep-fade {
+  0% { opacity: 0; transform: translateY(0) scale(0.6); }
+  30% { opacity: 0.75; }
+  100% { opacity: 0; transform: translateY(20px) scale(1.1); }
+}
 @keyframes toast-in {
   from { opacity: 0; transform: translateX(16px); }
   to   { opacity: 1; transform: translateX(0); }
@@ -183,6 +196,191 @@ code {
   mix-blend-mode: lighten;
   opacity: 0.22;
   background: radial-gradient(ellipse at 0% 0%, rgba(255,189,56,0.35) 0%, rgba(255,189,56,0) 60%);
+}
+
+/* ---- Agent page stage + mascot ---- */
+.agent-stage-grid {
+  animation: fade-in 240ms ease-out;
+}
+
+.agent-stage-mascot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  pointer-events: none;
+  transition: transform 900ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease;
+  opacity: 0.82;
+}
+
+.agent-avatar-shell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  backdrop-filter: blur(12px);
+}
+
+.agent-avatar-core {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  line-height: 1;
+}
+
+.agent-avatar-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--color-foreground) 18%, transparent);
+  border-radius: 999px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.agent-preset-card {
+  min-height: 228px;
+}
+
+.agent-preset-card .agent-avatar-core {
+  transform: none;
+}
+
+.agent-preset-card[data-selected="true"] {
+  transform: translateY(-2px);
+}
+
+/* ---- Cron page cards ---- */
+.cron-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 30px;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 245, 235, 0.92);
+  backdrop-filter: blur(12px);
+}
+
+.cron-meta-chip-pastel {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(250, 248, 245, 0.92);
+  color: rgba(15, 23, 42, 0.78);
+  box-shadow: none;
+}
+
+.cron-soft-badge,
+.cron-soft-badge-muted {
+  border-width: 1px;
+  border-style: solid;
+  box-shadow: none;
+}
+
+.cron-soft-badge-neutral {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(250, 248, 245, 0.16);
+  color: rgba(255, 247, 237, 0.94);
+}
+
+.cron-soft-badge-amber {
+  border-color: rgba(254, 243, 199, 0.18);
+  background: rgba(255, 251, 235, 0.14);
+  color: rgba(255, 251, 235, 0.96);
+}
+
+.cron-soft-badge-sky {
+  border-color: rgba(224, 242, 254, 0.18);
+  background: rgba(240, 249, 255, 0.14);
+  color: rgba(240, 249, 255, 0.96);
+}
+
+.cron-soft-badge-emerald {
+  border-color: rgba(220, 252, 231, 0.18);
+  background: rgba(240, 253, 244, 0.14);
+  color: rgba(240, 253, 244, 0.96);
+}
+
+.cron-soft-badge-muted {
+  opacity: 0.94;
+}
+
+.cron-preset-pill > button {
+  border-radius: 999px;
+  min-height: 42px;
+  border-width: 1px;
+  padding-inline: 0.95rem;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: none;
+}
+
+.cron-preset-pill [role="listbox"] {
+  border-radius: 20px;
+  backdrop-filter: blur(18px);
+}
+
+.cron-preset-pill-emerald > button,
+.cron-preset-pill-emerald [role="listbox"] {
+  border-color: rgba(209, 250, 229, 0.18);
+  background: rgba(10, 28, 24, 0.96);
+}
+
+.cron-preset-pill-sky > button,
+.cron-preset-pill-sky [role="listbox"] {
+  border-color: rgba(224, 242, 254, 0.18);
+  background: rgba(10, 19, 31, 0.96);
+}
+
+.cron-preset-pill-amber > button,
+.cron-preset-pill-amber [role="listbox"] {
+  border-color: rgba(254, 243, 199, 0.18);
+  background: rgba(24, 16, 10, 0.96);
+}
+
+.cron-agent-select {
+  position: relative;
+  z-index: 260;
+}
+
+.cron-job-card {
+  position: relative;
+}
+
+.cron-job-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 26%);
+  opacity: 0.55;
+}
+
+.cron-action-cluster {
+  position: relative;
+  z-index: 1;
+}
+
+.cron-timeline-track {
+  box-shadow: none;
+}
+
+.cron-timeline-dot {
+  box-shadow: none;
+}
+
+.cron-schedule-row {
+  backdrop-filter: blur(10px);
 }
 
 /* ---- Reduced motion ---- */

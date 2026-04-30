@@ -922,6 +922,14 @@ OPTIONAL_ENV_VARS = {
         "tools": ["web_search", "web_extract"],
         "advanced": True,
     },
+    "THE_ODDS_API_KEY": {
+        "description": "The Odds API key for multi-book sports odds, arbitrage checks, and EV tracking",
+        "prompt": "The Odds API key",
+        "url": "https://the-odds-api.com/#get-access",
+        "password": True,
+        "category": "provider",
+        "advanced": True,
+    },
     "AIRTABLE_PAT": {
         "description": "Airtable personal access token for the lead database",
         "prompt": "Airtable personal access token",
