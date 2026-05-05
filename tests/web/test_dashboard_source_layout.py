@@ -70,3 +70,18 @@ def test_cron_page_has_schedule_builder_controls_for_human_editing() -> None:
     assert "Run pattern" in content
     assert "First run" in content
     assert "Second run" in content
+
+
+def test_cron_page_has_timezone_selector_and_browser_detection_copy() -> None:
+    content = CRON_PAGE_TSX.read_text(encoding="utf-8")
+
+    assert "Schedule timezone" in content
+    assert "Intl.DateTimeFormat().resolvedOptions().timeZone" in content
+    assert ".getConfig()" in content
+    assert ".saveConfig(" in content
+
+
+def test_cron_page_clarifies_that_once_means_recurring_daily_not_one_shot() -> None:
+    content = CRON_PAGE_TSX.read_text(encoding="utf-8")
+
+    assert "Once per day (recurring)" in content

@@ -664,6 +664,42 @@ def advance_next_run(job_id: str) -> bool:
     return False
 
 
+def recompute_all_next_runs() -> List[Dict[str, Any]]:
+    """Recompute ``next_run_at`` for all jobs using the current Hermes timezone.
+
+    This is primarily used after a timezone change so recurring cron jobs keep
+    the same intended wall-clock time in the newly selected timezone.
+    """
+    jobs = load_jobs()
+    updated_jobs: List[Dict[str, Any]] = []
+
+    for job in jobs:
+        schedule = job.get("schedule") or {}
+        kind = schedule.get("kind")
+        if kind not in {"once", "interval", "cron"}:
+            updated_jobs.append(_apply_skill_fields(job))
+            continue
+
+        next_run_at = compute_next_run(schedule, job.get("last_run_at"))
+        job["next_run_at"] = next_run_at
+
+        if not job.get("enabled", True) and job.get("state") == "paused":
+            updated_jobs.append(_apply_skill_fields(job))
+            continue
+
+        if next_run_at is None and kind == "once":
+            job["enabled"] = False
+            if job.get("state") != "paused":
+                job["state"] = "completed"
+        elif job.get("state") != "paused":
+            job["state"] = "scheduled"
+
+        updated_jobs.append(_apply_skill_fields(job))
+
+    save_jobs(jobs)
+    return updated_jobs
+
+
 def get_due_jobs() -> List[Dict[str, Any]]:
     """Get all jobs that are due to run now.
 

@@ -3,6 +3,7 @@
 import json
 import pytest
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from unittest.mock import patch
 
@@ -23,6 +24,7 @@ from cron.jobs import (
     advance_next_run,
     get_due_jobs,
     save_job_output,
+    recompute_all_next_runs,
 )
 
 
@@ -278,6 +280,60 @@ class TestUpdateJob:
     def test_update_nonexistent_returns_none(self, tmp_cron_dir):
         result = update_job("nonexistent_id", {"name": "X"})
         assert result is None
+
+
+class TestTimezoneRecompute:
+    def test_recompute_all_next_runs_rebases_daily_cron_to_new_timezone(self, tmp_cron_dir, monkeypatch):
+        import hermes_time
+
+        def reset_cache():
+            hermes_time._cached_tz = None
+            hermes_time._cached_tz_name = None
+            hermes_time._cache_resolved = False
+
+        monkeypatch.setenv("HERMES_TIMEZONE", "UTC")
+        reset_cache()
+        monkeypatch.setattr("cron.jobs._hermes_now", lambda: datetime(2026, 4, 30, 5, 0, tzinfo=timezone.utc))
+
+        job = create_job(prompt="Brussels morning run", schedule="0 7 * * *")
+        assert job["next_run_at"] == "2026-04-30T07:00:00+00:00"
+
+        monkeypatch.setenv("HERMES_TIMEZONE", "Europe/Brussels")
+        reset_cache()
+        monkeypatch.setattr(
+            "cron.jobs._hermes_now",
+            lambda: datetime(2026, 4, 30, 6, 30, tzinfo=ZoneInfo("Europe/Brussels")),
+        )
+
+        updated_jobs = recompute_all_next_runs()
+        updated = next(item for item in updated_jobs if item["id"] == job["id"])
+
+        assert updated["next_run_at"] == "2026-04-30T07:00:00+02:00"
+
+    def test_due_jobs_uses_updated_timezone_without_manual_cache_reset(self, tmp_cron_dir, monkeypatch):
+        import hermes_time
+
+        monkeypatch.setenv("HERMES_TIMEZONE", "UTC")
+        hermes_time.reset_cache()
+        monkeypatch.setattr("cron.jobs._hermes_now", lambda: datetime(2026, 4, 30, 5, 0, tzinfo=timezone.utc))
+
+        job = create_job(prompt="Morning cron", schedule="0 7 * * *")
+        assert job["next_run_at"] == "2026-04-30T07:00:00+00:00"
+
+        monkeypatch.setenv("HERMES_TIMEZONE", "Europe/Brussels")
+        monkeypatch.setattr(
+            "cron.jobs._hermes_now",
+            lambda: datetime(2026, 4, 30, 6, 30, tzinfo=ZoneInfo("Europe/Brussels")),
+        )
+        recompute_all_next_runs()
+
+        monkeypatch.setattr(
+            "cron.jobs._hermes_now",
+            lambda: datetime(2026, 4, 30, 7, 5, tzinfo=ZoneInfo("Europe/Brussels")),
+        )
+
+        due = get_due_jobs()
+        assert [item["id"] for item in due] == [job["id"]]
 
 
 class TestPauseResumeJob:

@@ -71,15 +71,43 @@ type TimelineEntry = {
   theme: JobTheme;
 };
 
-function formatTime(iso?: string | null): string {
+function formatTime(iso?: string | null, displayTimezone?: string): string {
   if (!iso) return "—";
   const d = new Date(iso);
   return d.toLocaleString(undefined, {
+    timeZone: displayTimezone || undefined,
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function getBrowserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch {
+    return "";
+  }
+}
+
+function getTimezoneOptions(browserTimezone: string): string[] {
+  const merged = new Set<string>();
+  if (browserTimezone) merged.add(browserTimezone);
+  merged.add("Europe/Brussels");
+  merged.add("UTC");
+
+  const intlWithSupportedValues = Intl as typeof Intl & {
+    supportedValuesOf?: (key: string) => string[];
+  };
+
+  if (typeof intlWithSupportedValues.supportedValuesOf === "function") {
+    for (const timezone of intlWithSupportedValues.supportedValuesOf("timeZone")) {
+      merged.add(timezone);
+    }
+  }
+
+  return Array.from(merged).sort((a, b) => a.localeCompare(b));
 }
 
 function truncatePrompt(prompt: string, limit = 120): string {
@@ -369,6 +397,10 @@ export default function CronPage() {
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
   const [editDrafts, setEditDrafts] = useState<Record<string, EditDraft>>({});
   const [savingJobId, setSavingJobId] = useState<string | null>(null);
+  const [cronConfig, setCronConfig] = useState<Record<string, unknown> | null>(null);
+  const [configTimezone, setConfigTimezone] = useState<string>("");
+  const [timezoneSaving, setTimezoneSaving] = useState(false);
+  const [browserTimezone] = useState(() => getBrowserTimezone());
   const { toast, showToast } = useToast();
   const { t } = useI18n();
 
@@ -391,13 +423,26 @@ export default function CronPage() {
       .catch(() => setPresets([]));
   };
 
+  const loadCronConfig = () => {
+    api
+      .getConfig()
+      .then((config) => {
+        setCronConfig(config);
+        const savedTimezone = typeof config.timezone === "string" ? config.timezone : "";
+        setConfigTimezone(savedTimezone || browserTimezone || "");
+      })
+      .catch(() => setCronConfig(null));
+  };
+
   useEffect(() => {
     loadPresets();
     loadJobs();
+    loadCronConfig();
   }, []);
 
   const hourOptions = Array.from({ length: 24 }, (_, hour) => padTime(hour));
   const minuteOptions = ["00", "05", "10", "15", "20", "30", "40", "45", "50", "55"];
+  const timezoneOptions = useMemo(() => getTimezoneOptions(browserTimezone), [browserTimezone]);
 
   const timelineEntries = useMemo<TimelineEntry[]>(() => {
     const entries = jobs.flatMap((job) => {
@@ -559,6 +604,25 @@ export default function CronPage() {
     }
   };
 
+  const handleTimezoneChange = async (selectedValue: string) => {
+    if (!cronConfig) return;
+    const nextTimezone = selectedValue === "__server__" ? "" : selectedValue;
+
+    setTimezoneSaving(true);
+    try {
+      const nextConfig = { ...cronConfig, timezone: nextTimezone };
+      await api.saveConfig(nextConfig);
+      setCronConfig(nextConfig);
+      setConfigTimezone(nextTimezone);
+      showToast(`Scheduler timezone set to ${nextTimezone || "server-local"}`, "success");
+      loadJobs();
+    } catch (error) {
+      showToast(`Couldn't update scheduler timezone: ${error}`, "error");
+    } finally {
+      setTimezoneSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -594,10 +658,37 @@ export default function CronPage() {
                   Window view assumes each cron takes roughly 15–20 minutes. Use this to avoid overlapping runs and shift exact execution times when needed.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2 text-[0.72rem] text-muted-foreground">
-                <span className="cron-meta-chip">{timelineEntries.length} run windows/day</span>
-                <span className="cron-meta-chip">Longest run ≈ {longestDuration || 0} min</span>
-                <span className="cron-meta-chip">{overlapCount ? `${overlapCount} overlap risk` : "No overlap risk"}</span>
+              <div className="flex flex-col gap-3 lg:items-end">
+                <div className="grid min-w-[280px] gap-2 rounded-[18px] border border-white/8 bg-white/[0.03] p-3">
+                  <Label>Schedule timezone</Label>
+                  <Select
+                    value={configTimezone || "__server__"}
+                    onValueChange={handleTimezoneChange}
+                    className="cron-preset-pill cron-preset-pill-emerald"
+                  >
+                    {browserTimezone && (
+                      <SelectOption value={browserTimezone}>Auto-detected · {browserTimezone}</SelectOption>
+                    )}
+                    <SelectOption value="Europe/Brussels">Europe/Brussels</SelectOption>
+                    <SelectOption value="UTC">UTC</SelectOption>
+                    <SelectOption value="__server__">Server local fallback</SelectOption>
+                    {timezoneOptions
+                      .filter((timezone) => ![browserTimezone, "Europe/Brussels", "UTC"].includes(timezone))
+                      .slice(0, 200)
+                      .map((timezone) => (
+                        <SelectOption key={timezone} value={timezone}>{timezone}</SelectOption>
+                      ))}
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Cron expressions run in this timezone. {browserTimezone ? `Detected from this browser: ${browserTimezone}. Pick a timezone here to save or switch the scheduler convention.` : "Pick the timezone your schedules should follow."}
+                    {timezoneSaving ? " Saving…" : ""}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-[0.72rem] text-muted-foreground">
+                  <span className="cron-meta-chip">{timelineEntries.length} run windows/day</span>
+                  <span className="cron-meta-chip">Longest run ≈ {longestDuration || 0} min</span>
+                  <span className="cron-meta-chip">{overlapCount ? `${overlapCount} overlap risk` : "No overlap risk"}</span>
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -788,7 +879,7 @@ export default function CronPage() {
                                 onValueChange={(value) => handleScheduleBuilderChange(job.id, "pattern", value)}
                                 className="cron-preset-pill cron-preset-pill-emerald"
                               >
-                                <SelectOption value="once">Once per day</SelectOption>
+                                <SelectOption value="once">Once per day (recurring)</SelectOption>
                                 <SelectOption value="twice">Twice per day</SelectOption>
                                 <SelectOption value="three">3 times per day</SelectOption>
                                 <SelectOption value="custom">Custom expression</SelectOption>
@@ -894,8 +985,8 @@ export default function CronPage() {
                     {primaryRunWindow && (
                       <span className="cron-meta-chip cron-meta-chip-pastel">Starts {primaryRunWindow}</span>
                     )}
-                    <span className="cron-meta-chip cron-meta-chip-pastel">Last: {formatTime(job.last_run_at)}</span>
-                    <span className="cron-meta-chip cron-meta-chip-pastel">Next: {formatTime(job.next_run_at)}</span>
+                    <span className="cron-meta-chip cron-meta-chip-pastel">Last: {formatTime(job.last_run_at, configTimezone || browserTimezone || undefined)}</span>
+                    <span className="cron-meta-chip cron-meta-chip-pastel">Next: {formatTime(job.next_run_at, configTimezone || browserTimezone || undefined)}</span>
                   </div>
 
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

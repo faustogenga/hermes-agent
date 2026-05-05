@@ -102,6 +102,17 @@ class TestHermesTimeNow:
         r2 = hermes_time.now()
         assert r2.utcoffset() == timedelta(hours=5, minutes=30)
 
+    def test_cache_auto_refreshes_when_env_timezone_changes(self):
+        """Changing HERMES_TIMEZONE should not require a manual reset_cache()."""
+        os.environ["HERMES_TIMEZONE"] = "UTC"
+        _reset_hermes_time_cache()
+        r1 = hermes_time.now()
+        assert r1.utcoffset() == timedelta(0)
+
+        os.environ["HERMES_TIMEZONE"] = "Europe/Brussels"
+        r2 = hermes_time.now()
+        assert r2.utcoffset() in (timedelta(hours=1), timedelta(hours=2))
+
 
 class TestGetTimezone:
     """Test get_timezone()."""

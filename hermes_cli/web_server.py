@@ -1003,7 +1003,19 @@ async def activate_agent(slug: str, body: Optional[AgentActivatePayload] = None)
 @app.put("/api/config")
 async def update_config(body: ConfigUpdate):
     try:
-        save_config(_denormalize_config_from_web(body.config))
+        previous_config = load_config()
+        next_config = _denormalize_config_from_web(body.config)
+        save_config(next_config)
+
+        previous_timezone = str(previous_config.get("timezone") or "").strip()
+        next_timezone = str(next_config.get("timezone") or "").strip()
+        if previous_timezone != next_timezone:
+            import hermes_time
+            from cron.jobs import recompute_all_next_runs
+
+            hermes_time.reset_cache()
+            recompute_all_next_runs()
+
         return {"ok": True}
     except Exception as e:
         _log.exception("PUT /api/config failed")

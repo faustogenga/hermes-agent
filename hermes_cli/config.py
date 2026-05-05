@@ -3075,6 +3075,12 @@ def save_config(config: Dict[str, Any]):
     _secure_file(config_path)
     _LAST_EXPANDED_CONFIG_BY_PATH[str(config_path)] = copy.deepcopy(current_normalized)
 
+    try:
+        import hermes_time
+        hermes_time.reset_cache()
+    except Exception:
+        pass
+
 
 def load_env() -> Dict[str, str]:
     """Load environment variables from ~/.hermes/.env.

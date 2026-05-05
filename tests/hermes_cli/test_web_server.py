@@ -266,7 +266,9 @@ class TestWebServerEndpoints:
         assert data["active_personality"] == "kawaii"
         assert data["model"]["model"] == "openai/gpt-5"
         assert data["current_preset"]["default_skills"] == ["local-business-opportunity-finder"]
-        assert {preset["slug"] for preset in data["presets"]} == {"default", "lead-hunter", "flight-finder"}
+        preset_slugs = {preset["slug"] for preset in data["presets"]}
+        assert {"default", "lead-hunter", "flight-finder"}.issubset(preset_slugs)
+        assert "brussels-housing-hunter" in preset_slugs
         assert next(preset for preset in data["presets"] if preset["slug"] == "flight-finder")["default_skills"] == ["flight-fare-monitoring"]
         assert data["source_map"]["soul"]["path"].endswith("lead-hunter/SOUL.md")
         assert "Find verified local SMB opportunities." in data["source_map"]["soul"]["content"]
@@ -736,6 +738,28 @@ class TestNewEndpoints:
     def test_cron_job_not_found(self):
         resp = self.client.get("/api/cron/jobs/nonexistent-id")
         assert resp.status_code == 404
+
+    def test_put_config_recomputes_cron_runs_when_timezone_changes(self, monkeypatch):
+        import hermes_cli.web_server as web_server
+
+        saved = {}
+        recompute_calls = []
+        reset_calls = []
+
+        monkeypatch.setattr(web_server, "load_config", lambda: {"timezone": ""})
+        monkeypatch.setattr(web_server, "save_config", lambda config: saved.setdefault("config", config))
+        monkeypatch.setattr("cron.jobs.recompute_all_next_runs", lambda: recompute_calls.append(True))
+        monkeypatch.setattr("hermes_time.reset_cache", lambda: reset_calls.append(True))
+
+        resp = self.client.put(
+            "/api/config",
+            json={"config": {"timezone": "Europe/Brussels", "model": "openai/gpt-5"}},
+        )
+
+        assert resp.status_code == 200
+        assert saved["config"]["timezone"] == "Europe/Brussels"
+        assert recompute_calls == [True]
+        assert reset_calls == [True]
 
     def test_skills_list(self):
         resp = self.client.get("/api/skills")
