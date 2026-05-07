@@ -42,6 +42,7 @@ AUTHOR_MAP = {
     # teknium (multiple emails)
     "teknium1@gmail.com": "teknium1",
     "0x.badfriend@gmail.com": "discodirector",
+    "altriatree@gmail.com": "TruaShamu",
     "m@mobrienv.dev": "mikeyobrien",
     "qiyin.zuo@pcitc.com": "qiyin-code",
     "oleksii.lisikh@gmail.com": "olisikh",
@@ -52,6 +53,7 @@ AUTHOR_MAP = {
     "cleo@edaphic.xyz": "curiouscleo",
     "127238744+teknium1@users.noreply.github.com": "teknium1",
     "128259593+Gutslabs@users.noreply.github.com": "Gutslabs",
+    "50326054+nocturnum91@users.noreply.github.com": "nocturnum91",
     "159539633+MottledShadow@users.noreply.github.com": "MottledShadow",
     "aludwin+gh@gmail.com": "adamludwin",
     "ngusev@astralinux.ru": "NikolayGusev-astra",
@@ -78,6 +80,7 @@ AUTHOR_MAP = {
     "51599529+stephen0110@users.noreply.github.com": "stephen0110",
     "265632032+sonic-netizen@users.noreply.github.com": "sonic-netizen",
     "82531659+mwnickerson@users.noreply.github.com": "mwnickerson",
+    "sandrohub013@gmail.com": "SandroHub013",
     "154585401+LeonSGP43@users.noreply.github.com": "LeonSGP43",
     "zjtan1@gmail.com": "zeejaytan",
     "asslaenn5@gmail.com": "Aslaaen",
@@ -262,6 +265,7 @@ AUTHOR_MAP = {
     "36056348+sirEven@users.noreply.github.com": "sirEven",
     "70424851+insecurejezza@users.noreply.github.com": "insecurejezza",
     "jezzahehn@gmail.com": "JezzaHehn",
+    "barnacleboy.jezzahehn@agentmail.to": "JezzaHehn",
     "254021826+dodo-reach@users.noreply.github.com": "dodo-reach",
     "259807879+Bartok9@users.noreply.github.com": "Bartok9",
     "270082434+crayfish-ai@users.noreply.github.com": "crayfish-ai",
@@ -454,6 +458,7 @@ AUTHOR_MAP = {
     "51599529+stephen0110@users.noreply.github.com": "stephen0110",
     "265632032+sonic-netizen@users.noreply.github.com": "sonic-netizen",
     "82531659+mwnickerson@users.noreply.github.com": "mwnickerson",
+    "sandrohub013@gmail.com": "SandroHub013",
     "h3057183414@gmail.com": "CoreyNoDream",
     "franksong2702@gmail.com": "franksong2702",
     "673088860@qq.com": "ambition0802",
@@ -865,6 +870,7 @@ AUTHOR_MAP = {
     "leosma@gmail.com": "leon7609",  # PR #19069
     "nouseman666@gmail.com": "nouseman666",  # PR #19088
     "ginwu05@gmail.com": "GinWU05",  # PR #19093
+    "lxl694522264@gmail.com": "EvilDrag0n",  # PR #20651
 }
 
 
