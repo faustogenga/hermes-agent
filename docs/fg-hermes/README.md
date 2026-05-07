@@ -1,7 +1,13 @@
-# lead_hunter — feature specs (plugin-based)
+# fg-hermes — feature specs (plugin-based)
 
-Three documents that together describe the **`lead_hunter` plugin** —
-a self-contained directory under `plugins/` that adds:
+Three documents that together describe the **`fg-hermes` plugin** —
+a self-contained directory at `plugins/fg_hermes/` that adds:
+
+> Naming note: the **plugin** is `fg-hermes` (`plugins/fg_hermes/` on
+> disk; `fg-hermes` in URLs and the manifest). The built-in **preset**
+> named "Lead Hunter" (`slug: lead-hunter`) is one of several agent
+> identities the plugin ships — that name stays, since it describes
+> what that specific preset *does*.
 
 - Custom **agent presets** (Lead Hunter, Flight Finder, Brussels
   Housing Hunter, etc.) with a dashboard `Agents` tab to create / edit
@@ -47,7 +53,7 @@ git checkout main && git pull upstream main
 git checkout -b your-feature-branch
 
 # Step 1 — create the plugin scaffold
-mkdir -p plugins/lead_hunter/{agent/preset_templates,dashboard,web,cli,cron,hooks,tests}
+mkdir -p plugins/fg_hermes/{agent/preset_templates,dashboard,web,cli,cron,hooks,tests}
 
 # Step 2 — implement per AGENTS_FEATURE.md (engine, API, page)
 # Step 3 — implement per CRON_FEATURE.md   (cron wiring, page)
@@ -77,7 +83,7 @@ Python imports / runtime hooks aren't fully pluggable:
 These are listed in each spec under **"Shared-file touch-points"**
 and should each be marked `merge=ours` in `.gitattributes` so future
 upstream merges keep our version. The actual *implementation* of all
-the logic lives inside `plugins/lead_hunter/` — these touch-points
+the logic lives inside `plugins/fg_hermes/` — these touch-points
 are just dispatcher hooks.
 
 ## What's NOT in these specs
@@ -85,7 +91,7 @@ are just dispatcher hooks.
 - The `connections` plugin (under `plugins/example-dashboard/`) —
   separate concern; copy that directory in once, then leave alone.
 - Hunter / Apollo / Airtable env-var entries in `OPTIONAL_ENV_VARS` —
-  pure-add additions; copy into a `plugins/lead_hunter/env_keys.py`
+  pure-add additions; copy into a `plugins/fg_hermes/env_keys.py`
   module that registers them at import time.
 - Personality definitions (`config.agent.personalities`) — these are
   user-editable values in `~/.hermes/config.yaml`, not code.

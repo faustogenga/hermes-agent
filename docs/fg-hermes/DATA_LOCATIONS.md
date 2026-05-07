@@ -2,7 +2,7 @@
 
 Companion to [`AGENTS_FEATURE.md`](./AGENTS_FEATURE.md) and
 [`CRON_FEATURE.md`](./CRON_FEATURE.md). This is the **user-data
-contract**: as long as the `lead_hunter` plugin reads from and writes
+contract**: as long as the `fg-hermes` plugin reads from and writes
 to the paths below, with the same JSON / Markdown shapes, future
 upstream merges can rename the plugin code without losing user
 state. This file is the invariant the spec is anchored to.
@@ -34,7 +34,7 @@ below stay relative to whatever `get_hermes_home()` returns.
 Source of truth shipped with the plugin:
 
 ```
-plugins/lead_hunter/agent/preset_templates/
+plugins/fg_hermes/agent/preset_templates/
 ├── brussels-housing-hunter/AGENT.json
 ├── brussels-housing-hunter/AGENTS.md
 ├── brussels-housing-hunter/SOUL.md
@@ -151,7 +151,7 @@ interpreted against this TZ. Saving via `PUT /api/config` triggers
 
 ## Memory + identity sources used by AgentPage's source cards
 
-The `/api/plugins/lead-hunter/agent/profile` endpoint surfaces four
+The `/api/plugins/fg-hermes/agent/profile` endpoint surfaces four
 "source" files in addition to the preset's own `SOUL.md` /
 `AGENTS.md`:
 
@@ -199,13 +199,13 @@ rm -rf ~/.hermes/agents/ ~/.hermes/cron/jobs.json
 
 After reset, the next `hermes` startup re-creates the directories
 empty; built-in preset templates still load from
-`plugins/lead_hunter/agent/preset_templates/`.
+`plugins/fg_hermes/agent/preset_templates/`.
 
 ---
 
 ## Why these paths matter for the plugin design
 
-The `lead_hunter` plugin can be **renamed**, **rebuilt from scratch**,
+The `fg-hermes` plugin can be **renamed**, **rebuilt from scratch**,
 or **temporarily disabled** without affecting the user's saved
 presets and cron jobs. As long as the new code reads the paths above,
 all existing data round-trips. The user data is the durable state;
@@ -214,7 +214,7 @@ the plugin code is replaceable.
 When implementing per the spec:
 
 1. Built-in templates: ship in
-   `plugins/lead_hunter/agent/preset_templates/` (in repo).
+   `plugins/fg_hermes/agent/preset_templates/` (in repo).
 2. **Don't touch** `~/.hermes/`. The user's existing data (or future
    data they create) will work with the new plugin code as long as
    you read from / write to the paths documented here.

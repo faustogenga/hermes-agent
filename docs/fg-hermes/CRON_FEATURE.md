@@ -1,13 +1,13 @@
 # Cron + Agent Wiring — Feature Spec
 
 Companion to [`AGENTS_FEATURE.md`](./AGENTS_FEATURE.md). This doc
-specifies the cron-related half of the **`lead_hunter` plugin** —
+specifies the cron-related half of the **`fg-hermes` plugin** —
 making each scheduled cron job pick which agent preset it runs as,
 plus replacing the dashboard's CronPage with a richer version
 (timeline visualization, schedule builder, timezone control).
 
 Like the agents half, the implementation lives inside
-`plugins/lead_hunter/` so future `git pull upstream main` doesn't
+`plugins/fg_hermes/` so future `git pull upstream main` doesn't
 overwrite it. A handful of one-line touches to upstream files are
 listed in §7 and pinned with `merge=ours`.
 
@@ -179,7 +179,7 @@ export interface CronJob {
 
 ---
 
-## 4. CronPage UI — `plugins/lead_hunter/web/CronPage.tsx` (~1100 LOC)
+## 4. CronPage UI — `plugins/fg_hermes/web/CronPage.tsx` (~1100 LOC)
 
 Pulled into the main bundle via the same Vite alias trick as
 `AgentPage.tsx` (see [`AGENTS_FEATURE.md` §8](./AGENTS_FEATURE.md#8-routing--sidebar--vite-alias-trick)).
@@ -188,7 +188,7 @@ Add to `web/vite.config.ts`:
 ```ts
 {
   find: /^@\/pages\/CronPage$/,
-  replacement: path.resolve(__dirname, "../plugins/lead_hunter/web/CronPage.tsx"),
+  replacement: path.resolve(__dirname, "../plugins/fg_hermes/web/CronPage.tsx"),
 },
 ```
 
@@ -287,7 +287,7 @@ preset-tinted theme:
 
 Each theme exports CSS class strings for card / bubble / badge / pill
 / status / timeline-bar / action-button styling. CSS lives in
-`plugins/lead_hunter/web/styles.css` (imported once from
+`plugins/fg_hermes/web/styles.css` (imported once from
 `web/src/index.css`).
 
 ### Schedule builder
@@ -349,14 +349,14 @@ Each `<Card>` shows:
 const [presets, setPresets] = useState<AgentPresetSummary[]>([]);
 ```
 Loaded once on mount via `api.getAgents()` (which hits
-`/api/plugins/lead-hunter/agents` per `AGENTS_FEATURE.md` §6). If
+`/api/plugins/fg-hermes/agents` per `AGENTS_FEATURE.md` §6). If
 empty, fall back to `[{ slug: "default", name: "Default" }]`.
 
 ---
 
 ## 5. Custom CSS
 
-`plugins/lead_hunter/web/styles.css` (~198 lines):
+`plugins/fg_hermes/web/styles.css` (~198 lines):
 
 - `.cron-meta-chip` / `.cron-meta-chip-pastel` — small pill chips for
   status info
@@ -370,7 +370,7 @@ empty, fall back to `[{ slug: "default", name: "Default" }]`.
 
 Imported once from `web/src/index.css`:
 ```css
-@import "../../plugins/lead_hunter/web/styles.css";
+@import "../../plugins/fg_hermes/web/styles.css";
 ```
 
 (`web/src/index.css` is pinned `merge=ours` since this single import
@@ -378,7 +378,7 @@ line is fork-local.)
 
 ---
 
-## 6. Tests — `plugins/lead_hunter/tests/`
+## 6. Tests — `plugins/fg_hermes/tests/`
 
 Add to the existing plugin tests (covered by `AGENTS_FEATURE.md` §9):
 
@@ -425,9 +425,9 @@ for the full pin list.)
 5. Add `hermes_time.reset_cache()` helper if not present.
 6. Patch `web/src/lib/api.ts`: `createCronJob` adds `agent_name`,
    `updateCronJob` is added, `CronJob` interface gains `agent_name`.
-7. Add `plugins/lead_hunter/web/CronPage.tsx` (the full UI).
+7. Add `plugins/fg_hermes/web/CronPage.tsx` (the full UI).
 8. Add the Vite + tsconfig alias for `@/pages/CronPage` (per §4).
-9. Move custom CSS into `plugins/lead_hunter/web/styles.css` and
+9. Move custom CSS into `plugins/fg_hermes/web/styles.css` and
    `@import` it from `web/src/index.css`.
 10. Pin the new files in `.gitattributes` (§7).
 11. Port the cron tests from §6.

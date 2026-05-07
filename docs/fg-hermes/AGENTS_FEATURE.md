@@ -1,16 +1,22 @@
 # Agent Presets — Feature Spec
 
-Goal: build a **`lead_hunter` plugin** under `plugins/` that adds
-agent presets (Lead Hunter, Flight Finder, Brussels Housing Hunter,
-…). Each preset is a self-contained identity (name, emoji, role,
-goal, `SOUL.md`, `AGENTS.md`, default skills, optional personality).
+Goal: build a **`fg-hermes` plugin** at `plugins/fg_hermes/` that
+adds agent presets (Lead Hunter, Flight Finder, Brussels Housing
+Hunter, …). Each preset is a self-contained identity (name, emoji,
+role, goal, `SOUL.md`, `AGENTS.md`, default skills, optional
+personality).
+
+> Plugin name vs preset name: the plugin is `fg-hermes` (the wrapper
+> for all this fork-local code). The preset named "Lead Hunter" is
+> one of the agents the plugin ships — those names describe what the
+> presets *do* and stay as-is.
 
 The dashboard gets an **Agents** tab where the user creates, edits,
 activates, and deletes presets. Cron jobs (see
 [`CRON_FEATURE.md`](./CRON_FEATURE.md)) can pick which preset to run
 as via the `agent_name` field.
 
-The whole thing lives inside `plugins/lead_hunter/` so future
+The whole thing lives inside `plugins/fg_hermes/` so future
 `git pull upstream main` cannot overwrite it. A handful of one-line
 touches in upstream files act as dispatcher hooks; those are listed
 in §11.
@@ -49,7 +55,7 @@ slug). When unset, `"default"` is used.
 ### Built-in templates (shipped with the plugin, version-controlled)
 
 ```
-plugins/lead_hunter/agent/preset_templates/
+plugins/fg_hermes/agent/preset_templates/
 ├── brussels-housing-hunter/
 │   ├── AGENT.json                 metadata
 │   ├── SOUL.md                    identity prompt
@@ -111,7 +117,7 @@ The default preset is special: its `SOUL.md` lives at
    `$HERMES_HOME/agents/default/AGENT.json` if present, else hard-coded
    defaults).
 2. Built-in templates from
-   `plugins/lead_hunter/agent/preset_templates/*/AGENT.json` that
+   `plugins/fg_hermes/agent/preset_templates/*/AGENT.json` that
    aren't already overridden.
 3. User-created presets in `$HERMES_HOME/agents/*/` that have both
    `AGENT.json` AND `SOUL.md` AND `enabled: true`.
@@ -120,7 +126,7 @@ User overrides at the same slug as a built-in template **win**.
 
 ---
 
-## 3. Core Python module — `plugins/lead_hunter/agent/presets.py`
+## 3. Core Python module — `plugins/fg_hermes/agent/presets.py`
 
 ~310 lines. Public API:
 
@@ -168,7 +174,7 @@ Notes:
 ### Convenience re-export (optional)
 
 To keep import sites short, add a tiny shim at
-`plugins/lead_hunter/agent/__init__.py`:
+`plugins/fg_hermes/agent/__init__.py`:
 
 ```python
 from .presets import (
@@ -180,7 +186,7 @@ from .presets import (
 ```
 
 Then upstream files (the touch-points in §11) can do
-`from plugins.lead_hunter.agent import resolve_agent_preset, ...`.
+`from plugins.fg_hermes.agent import resolve_agent_preset, ...`.
 
 ---
 
@@ -225,7 +231,7 @@ def build_context_files_prompt(cwd=None, skip_soul=False, agent_preset=None) -> 
 ### `run_agent.py` — `AIAgent.__init__` (PATCH — pinned `merge=ours`)
 
 ```python
-from plugins.lead_hunter.agent import resolve_agent_preset
+from plugins.fg_hermes.agent import resolve_agent_preset
 
 class AIAgent:
     def __init__(self, ..., agent_preset: str = None, ...):
@@ -256,7 +262,7 @@ context_prompt = build_context_files_prompt(..., agent_preset=self.agent_preset)
 ### `cli.py` — interactive REPL (PATCH — pinned `merge=ours`)
 
 ```python
-from plugins.lead_hunter.agent import (
+from plugins.fg_hermes.agent import (
     get_active_agent_slug, list_agent_presets, resolve_agent_preset,
 )
 
@@ -302,9 +308,9 @@ not code we ship.
 
 ---
 
-## 5. Backend API — `plugins/lead_hunter/dashboard/plugin_api.py`
+## 5. Backend API — `plugins/fg_hermes/dashboard/plugin_api.py`
 
-Auto-mounted by Hermes at `/api/plugins/lead-hunter/`.
+Auto-mounted by Hermes at `/api/plugins/fg-hermes/`.
 
 | Method | Path                                  | Body                | Returns                                                                          |
 |--------|---------------------------------------|---------------------|----------------------------------------------------------------------------------|
@@ -315,16 +321,16 @@ Auto-mounted by Hermes at `/api/plugins/lead-hunter/`.
 | DELETE | `/agents/{slug}`                      | —                   | `{ok: true}` (400 if slug == "default", 404 if missing)                          |
 | POST   | `/agents/{slug}/activate`             | optional `{slug}`   | `{ok: true, active_preset}` — also clears active when preset is deleted          |
 
-### Plugin manifest — `plugins/lead_hunter/dashboard/manifest.json`
+### Plugin manifest — `plugins/fg_hermes/dashboard/manifest.json`
 
 ```json
 {
-  "name": "lead-hunter",
-  "label": "Lead Hunter",
+  "name": "fg-hermes",
+  "label": "FG Hermes",
   "description": "Custom agent presets and preset-aware cron scheduling.",
   "icon": "Bot",
   "version": "1.0.0",
-  "tab": { "path": "/lead-hunter", "hidden": true, "position": "end" },
+  "tab": { "path": "/fg-hermes", "hidden": true, "position": "end" },
   "api": "plugin_api.py"
 }
 ```
@@ -423,27 +429,27 @@ These are short additions to the existing `api` object. Pin
 export const api = {
   // ...existing upstream methods...
 
-  // ── lead_hunter plugin: agent preset endpoints ─────────────────────
-  // Mounted at /api/plugins/lead-hunter/ — see
-  // plugins/lead_hunter/dashboard/plugin_api.py.
+  // ── fg-hermes plugin: agent preset endpoints ──────────────────────
+  // Mounted at /api/plugins/fg-hermes/ — see
+  // plugins/fg_hermes/dashboard/plugin_api.py.
   getAgentProfile: () =>
-    fetchJSON<AgentProfileResponse>("/api/plugins/lead-hunter/agent/profile"),
+    fetchJSON<AgentProfileResponse>("/api/plugins/fg-hermes/agent/profile"),
   getAgents: () =>
     fetchJSON<{ active_preset: string; presets: AgentPresetSummary[]; available_personalities: string[] }>(
-      "/api/plugins/lead-hunter/agents"
+      "/api/plugins/fg-hermes/agents"
     ),
   createAgent: (agent: AgentPresetUpsertPayload) =>
-    fetchJSON<AgentPresetDetail>("/api/plugins/lead-hunter/agents",
+    fetchJSON<AgentPresetDetail>("/api/plugins/fg-hermes/agents",
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(agent) }),
   updateAgent: (slug: string, agent: AgentPresetUpsertPayload) =>
-    fetchJSON<AgentPresetDetail>(`/api/plugins/lead-hunter/agents/${encodeURIComponent(slug)}`,
+    fetchJSON<AgentPresetDetail>(`/api/plugins/fg-hermes/agents/${encodeURIComponent(slug)}`,
       { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(agent) }),
   activateAgent: (slug: string) =>
     fetchJSON<{ ok: boolean; active_preset: string }>(
-      `/api/plugins/lead-hunter/agents/${encodeURIComponent(slug)}/activate`,
+      `/api/plugins/fg-hermes/agents/${encodeURIComponent(slug)}/activate`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug }) }),
   deleteAgent: (slug: string) =>
-    fetchJSON<{ ok: boolean }>(`/api/plugins/lead-hunter/agents/${encodeURIComponent(slug)}`,
+    fetchJSON<{ ok: boolean }>(`/api/plugins/fg-hermes/agents/${encodeURIComponent(slug)}`,
       { method: "DELETE" }),
 };
 ```
@@ -477,13 +483,13 @@ export interface AgentProfileResponse {
 }
 ```
 
-Putting these types into `plugins/lead_hunter/web/types.ts` and
+Putting these types into `plugins/fg_hermes/web/types.ts` and
 re-importing from `web/src/lib/api.ts` works too — the file location
 is style preference, not load-bearing.
 
 ---
 
-## 7. AgentPage UI — `plugins/lead_hunter/web/AgentPage.tsx` (~854 lines)
+## 7. AgentPage UI — `plugins/fg_hermes/web/AgentPage.tsx` (~854 lines)
 
 A two-pane layout: a **grid of preset cards** on the left, a
 **preset editor** on the right.
@@ -586,7 +592,7 @@ If the initial `api.getAgentProfile()` rejects:
 ## 8. Routing + sidebar — Vite alias trick
 
 The plugin TSX file lives at
-`plugins/lead_hunter/web/AgentPage.tsx`, **outside** `web/src/`.
+`plugins/fg_hermes/web/AgentPage.tsx`, **outside** `web/src/`.
 Pull it into the main bundle by aliasing the canonical import path
 in `web/vite.config.ts`:
 
@@ -595,7 +601,7 @@ resolve: {
   alias: [
     {
       find: /^@\/pages\/AgentPage$/,
-      replacement: path.resolve(__dirname, "../plugins/lead_hunter/web/AgentPage.tsx"),
+      replacement: path.resolve(__dirname, "../plugins/fg_hermes/web/AgentPage.tsx"),
     },
     // (CronPage alias — see CRON_FEATURE.md)
     { find: "@", replacement: path.resolve(__dirname, "./src") },
@@ -613,25 +619,25 @@ Mirror in `web/tsconfig.app.json`:
 
 ```json
 "paths": {
-  "@/pages/AgentPage": ["../plugins/lead_hunter/web/AgentPage.tsx"],
-  "@/pages/CronPage":  ["../plugins/lead_hunter/web/CronPage.tsx"],
+  "@/pages/AgentPage": ["../plugins/fg_hermes/web/AgentPage.tsx"],
+  "@/pages/CronPage":  ["../plugins/fg_hermes/web/CronPage.tsx"],
   "@/*": ["./src/*"]
 }
 ```
 
 Plugin TSX files import bare specifiers (`react`, `react-router-dom`,
 …) which Rollup/Vite resolve from `node_modules` walking up from the
-importing file. Since `plugins/lead_hunter/web/` is outside `web/`,
+importing file. Since `plugins/fg_hermes/web/` is outside `web/`,
 add a postinstall hook to `web/package.json`:
 
 ```json
-"postinstall": "node -e \"const fs=require('fs'),path=require('path');const link=path.resolve('..','plugins','lead_hunter','web','node_modules');try{fs.lstatSync(link)}catch{fs.symlinkSync(path.resolve('node_modules'),link,'dir');console.log('linked '+link+' -> ../node_modules')}\""
+"postinstall": "node -e \"const fs=require('fs'),path=require('path');const link=path.resolve('..','plugins','fg_hermes','web','node_modules');try{fs.lstatSync(link)}catch{fs.symlinkSync(path.resolve('node_modules'),link,'dir');console.log('linked '+link+' -> ../node_modules')}\""
 ```
 
 …and gitignore the symlink:
 
 ```gitignore
-plugins/lead_hunter/web/node_modules
+plugins/fg_hermes/web/node_modules
 ```
 
 Then `web/src/App.tsx` (touch-point pinned `merge=ours`) keeps the
@@ -660,17 +666,17 @@ this page conceptually. Either:
 
 ---
 
-## 9. Tests — `plugins/lead_hunter/tests/`
+## 9. Tests — `plugins/fg_hermes/tests/`
 
 Mirror the upstream `tests/` tree. Add this to `pyproject.toml` so
 pytest discovers them:
 
 ```toml
 [tool.pytest.ini_options]
-testpaths = ["tests", "plugins/lead_hunter/tests"]
+testpaths = ["tests", "plugins/fg_hermes/tests"]
 ```
 
-And a one-file `plugins/lead_hunter/tests/conftest.py` that bridges
+And a one-file `plugins/fg_hermes/tests/conftest.py` that bridges
 the hermetic fixtures from the main `tests/conftest.py`:
 
 ```python
@@ -695,7 +701,7 @@ Required coverage:
 - `get_active_agent_slug` falls back to "default" when the configured
   slug doesn't exist.
 - `delete_agent_preset("default")` raises `ValueError`.
-- The `/api/plugins/lead-hunter/agent/profile` endpoint returns the
+- The `/api/plugins/fg-hermes/agent/profile` endpoint returns the
   full payload shape.
 - POST/PUT/DELETE/activate routes round-trip correctly.
 - CLI `--agent <slug>` flag and `/agent use <slug>` slash command.
@@ -710,7 +716,7 @@ brussels-housing-hunter, flight-finder, lead-hunter).
 ## 10. Final plugin layout
 
 ```
-plugins/lead_hunter/
+plugins/fg_hermes/
 ├── README.md
 ├── __init__.py
 ├── agent/
@@ -771,26 +777,26 @@ absorb, take the upstream version explicitly with
 
 ## 12. Re-implementation order (from a fresh main checkout)
 
-1. `mkdir -p plugins/lead_hunter/{agent/preset_templates,dashboard,web,tests}`.
+1. `mkdir -p plugins/fg_hermes/{agent/preset_templates,dashboard,web,tests}`.
 2. Copy template directories from any existing source (the
    lead-hunter-custom-backup branch has them at
    `agent/preset_templates/`):
    ```bash
    git checkout lead-hunter-custom-backup-2026-05-05 -- agent/preset_templates/
-   git mv agent/preset_templates plugins/lead_hunter/agent/preset_templates
+   git mv agent/preset_templates plugins/fg_hermes/agent/preset_templates
    ```
-3. Add `plugins/lead_hunter/agent/presets.py` (the engine) and
+3. Add `plugins/fg_hermes/agent/presets.py` (the engine) and
    `__init__.py` (re-exports).
 4. Add the 5 shared-file patches from §4 + §11; pin them with
    `merge=ours`.
-5. Add `plugins/lead_hunter/dashboard/{manifest.json, plugin_api.py}`
+5. Add `plugins/fg_hermes/dashboard/{manifest.json, plugin_api.py}`
    with the 6 routes + helpers (§5).
-6. Add `plugins/lead_hunter/web/AgentPage.tsx` (the UI from §7).
+6. Add `plugins/fg_hermes/web/AgentPage.tsx` (the UI from §7).
 7. Update `web/vite.config.ts`, `web/tsconfig.app.json`,
    `web/package.json`, and `web/src/App.tsx` per §8.
 8. Extend `web/src/lib/api.ts` with the 6 new methods + types (§6).
 9. Hide upstream's `/profiles` tab (§8).
-10. Port tests from §9; run `pytest plugins/lead_hunter/tests/`.
+10. Port tests from §9; run `pytest plugins/fg_hermes/tests/`.
 11. `npm run build`; smoke the dashboard.
 
 The cron half lives in [`CRON_FEATURE.md`](./CRON_FEATURE.md).
