@@ -1,15 +1,23 @@
 # Agent Presets — Feature Spec
 
-Goal: re-implement on a fresh branch from `main` everything the
-`lead-hunter-custom-backup-2026-05-05` branch built for **agent
-presets** — the system that lets the user define multiple distinct
-personas (Lead Hunter, Flight Finder, Brussels Housing Hunter, etc.),
-edit them in the dashboard, and assign them to cron jobs so each
-scheduled run loads its preset's identity.
+Goal: build a **`lead_hunter` plugin** under `plugins/` that adds
+agent presets (Lead Hunter, Flight Finder, Brussels Housing Hunter,
+…). Each preset is a self-contained identity (name, emoji, role,
+goal, `SOUL.md`, `AGENTS.md`, default skills, optional personality).
 
-This is **not** the same as upstream's "Profiles : Multi Agents" (which
-appeared in main later and overlaps; the upstream feature should be
-hidden or removed).
+The dashboard gets an **Agents** tab where the user creates, edits,
+activates, and deletes presets. Cron jobs (see
+[`CRON_FEATURE.md`](./CRON_FEATURE.md)) can pick which preset to run
+as via the `agent_name` field.
+
+The whole thing lives inside `plugins/lead_hunter/` so future
+`git pull upstream main` cannot overwrite it. A handful of one-line
+touches in upstream files act as dispatcher hooks; those are listed
+in §11.
+
+This is **not** the same as upstream's "Profiles : Multi Agents"
+(which appeared later in main and overlaps conceptually). When
+shipping, hide the upstream `/profiles` tab.
 
 ---
 
@@ -38,11 +46,10 @@ slug). When unset, `"default"` is used.
 
 ## 2. Filesystem layout
 
-### Built-in templates (shipped in repo)
+### Built-in templates (shipped with the plugin, version-controlled)
 
 ```
-agent/preset_templates/
-├── default/                       (no built-in dir; created lazily — see below)
+plugins/lead_hunter/agent/preset_templates/
 ├── brussels-housing-hunter/
 │   ├── AGENT.json                 metadata
 │   ├── SOUL.md                    identity prompt
@@ -57,7 +64,10 @@ agent/preset_templates/
     └── AGENTS.md
 ```
 
-### User overrides + custom presets (per-host)
+(The `default` preset is synthesized in code; it has no template
+directory — its `SOUL.md` is the legacy `~/.hermes/SOUL.md`.)
+
+### User overrides + custom presets (per-host, not in repo)
 
 ```
 $HERMES_HOME/agents/
@@ -100,7 +110,8 @@ The default preset is special: its `SOUL.md` lives at
 1. Always: the **default** preset (synthesized from
    `$HERMES_HOME/agents/default/AGENT.json` if present, else hard-coded
    defaults).
-2. Built-in templates from `agent/preset_templates/*/AGENT.json` that
+2. Built-in templates from
+   `plugins/lead_hunter/agent/preset_templates/*/AGENT.json` that
    aren't already overridden.
 3. User-created presets in `$HERMES_HOME/agents/*/` that have both
    `AGENT.json` AND `SOUL.md` AND `enabled: true`.
@@ -109,9 +120,9 @@ User overrides at the same slug as a built-in template **win**.
 
 ---
 
-## 3. Core Python module
+## 3. Core Python module — `plugins/lead_hunter/agent/presets.py`
 
-`agent/agent_presets.py` (~310 lines) — the engine. Public API:
+~310 lines. Public API:
 
 ```python
 @dataclass
@@ -150,14 +161,32 @@ Notes:
 - `save_agent_preset` writes `AGENT.json` + `SOUL.md` + optional
   `AGENTS.md` atomically; rejects empty content for SOUL/AGENTS by
   deleting the file.
-- The `_BUILTIN_TEMPLATE_DIR` is computed as `Path(__file__).parent /
-  "preset_templates"` — relocate together with the module.
+- `_BUILTIN_TEMPLATE_DIR = Path(__file__).resolve().parent /
+  "preset_templates"` — keep the templates directory next to this
+  module so the path resolves automatically.
+
+### Convenience re-export (optional)
+
+To keep import sites short, add a tiny shim at
+`plugins/lead_hunter/agent/__init__.py`:
+
+```python
+from .presets import (
+    AgentPreset, slugify_agent_name, get_agent_presets_dir,
+    get_default_agent_preset, list_agent_presets, load_agent_preset,
+    get_active_agent_slug, resolve_agent_preset,
+    save_agent_preset, delete_agent_preset, read_agent_preset_source,
+)
+```
+
+Then upstream files (the touch-points in §11) can do
+`from plugins.lead_hunter.agent import resolve_agent_preset, ...`.
 
 ---
 
-## 4. Wiring into the agent runtime
+## 4. Wiring into the agent runtime (shared-file touch-points)
 
-### `agent/prompt_builder.py`
+### `agent/prompt_builder.py` (PATCH — pinned `merge=ours`)
 
 Two function signatures gain an `agent_preset=None` keyword:
 
@@ -193,10 +222,10 @@ def build_context_files_prompt(cwd=None, skip_soul=False, agent_preset=None) -> 
         ...
 ```
 
-### `run_agent.py` — `AIAgent.__init__`
+### `run_agent.py` — `AIAgent.__init__` (PATCH — pinned `merge=ours`)
 
 ```python
-from agent.agent_presets import resolve_agent_preset
+from plugins.lead_hunter.agent import resolve_agent_preset
 
 class AIAgent:
     def __init__(self, ..., agent_preset: str = None, ...):
@@ -224,10 +253,12 @@ if self.agent_preset.default_skills:
 context_prompt = build_context_files_prompt(..., agent_preset=self.agent_preset)
 ```
 
-### `cli.py` — interactive REPL
+### `cli.py` — interactive REPL (PATCH — pinned `merge=ours`)
 
 ```python
-from agent.agent_presets import get_active_agent_slug, list_agent_presets, resolve_agent_preset
+from plugins.lead_hunter.agent import (
+    get_active_agent_slug, list_agent_presets, resolve_agent_preset,
+)
 
 class CLI:
     def __init__(self, ..., agent_preset: str = None, ...):
@@ -247,27 +278,18 @@ Slash commands:
 
 CLI flag: `--agent <slug>` on `hermes` and `hermes chat`.
 
-### `cron/scheduler.py`
+### `hermes_cli/config.py` (PATCH — pinned `merge=ours`)
 
-When dispatching a job:
-```python
-AIAgent(..., agent_preset=job.get("agent_name"), ...)
-```
-The `agent_name` key on a cron job IS the preset slug. (The name
-predates the preset feature; it now overloads to mean preset.)
-
----
-
-## 5. Default config additions
-
-`hermes_cli/config.py` `DEFAULT_CONFIG`:
+Add to `DEFAULT_CONFIG["agent"]`:
 
 ```python
 "agent": {
     "active_preset": "default",
-    ...other agent settings...
+    ...other agent settings already present...
 },
 ```
+
+That's the only fork-local mutation here.
 
 `config.agent.personalities` is a dict of named personality overlays
 the user can attach to a preset. Each entry is either:
@@ -275,16 +297,14 @@ the user can attach to a preset. Each entry is either:
 - a dict `{"system_prompt": "...", "description": "..."}`.
 
 The preset's `personality` field references one of these keys (or `""`
-to skip).
+to skip). Personalities are user-editable values in `config.yaml`,
+not code we ship.
 
 ---
 
-## 6. Backend API
+## 5. Backend API — `plugins/lead_hunter/dashboard/plugin_api.py`
 
-All routes serve JSON; all require the dashboard session token header.
-On the **fresh branch**, mount these under
-`/api/plugins/lead-hunter/...` via `plugins/lead_hunter/dashboard/plugin_api.py`
-so they don't clutter the main FastAPI app:
+Auto-mounted by Hermes at `/api/plugins/lead-hunter/`.
 
 | Method | Path                                  | Body                | Returns                                                                          |
 |--------|---------------------------------------|---------------------|----------------------------------------------------------------------------------|
@@ -294,6 +314,23 @@ so they don't clutter the main FastAPI app:
 | PUT    | `/agents/{slug}`                      | `AgentPresetPayload`| Updated `AgentPresetDetail` (404 if missing)                                     |
 | DELETE | `/agents/{slug}`                      | —                   | `{ok: true}` (400 if slug == "default", 404 if missing)                          |
 | POST   | `/agents/{slug}/activate`             | optional `{slug}`   | `{ok: true, active_preset}` — also clears active when preset is deleted          |
+
+### Plugin manifest — `plugins/lead_hunter/dashboard/manifest.json`
+
+```json
+{
+  "name": "lead-hunter",
+  "label": "Lead Hunter",
+  "description": "Custom agent presets and preset-aware cron scheduling.",
+  "icon": "Bot",
+  "version": "1.0.0",
+  "tab": { "path": "/lead-hunter", "hidden": true, "position": "end" },
+  "api": "plugin_api.py"
+}
+```
+
+`tab.hidden = true` because the plugin doesn't render its own tab —
+its UI lives at `/agent` (an alias-routed page; see §8).
 
 ### `AgentPresetPayload` (Pydantic)
 
@@ -350,9 +387,7 @@ class AgentPresetPayload(BaseModel):
 `USER.md` lives at `$HERMES_HOME/memories/USER.md`,
 `MEMORY.md` at `$HERMES_HOME/memories/MEMORY.md`.
 
-### Helper functions to port
-
-From `hermes_cli/web_server.py` (or relocate to `plugin_api.py`):
+### Helper functions to ship inside `plugin_api.py`
 
 ```python
 def _read_dashboard_text(path) -> str
@@ -373,13 +408,24 @@ preset's metadata fields are empty.
 `_serialize_agent_preset` adds `active`, `personality_prompt`, and
 both file contents (soul + agents) to the preset dict.
 
+`_build_agent_profile_payload` does a lazy
+`from hermes_cli.web_server import get_model_info` to avoid import
+cycles when the web server loads the plugin.
+
 ---
 
-## 7. Frontend client (`web/src/lib/api.ts`)
+## 6. Frontend client — extend `web/src/lib/api.ts`
+
+These are short additions to the existing `api` object. Pin
+`web/src/lib/api.ts` with `merge=ours` so future merges keep them.
 
 ```ts
 export const api = {
-  // ...
+  // ...existing upstream methods...
+
+  // ── lead_hunter plugin: agent preset endpoints ─────────────────────
+  // Mounted at /api/plugins/lead-hunter/ — see
+  // plugins/lead_hunter/dashboard/plugin_api.py.
   getAgentProfile: () =>
     fetchJSON<AgentProfileResponse>("/api/plugins/lead-hunter/agent/profile"),
   getAgents: () =>
@@ -431,9 +477,13 @@ export interface AgentProfileResponse {
 }
 ```
 
+Putting these types into `plugins/lead_hunter/web/types.ts` and
+re-importing from `web/src/lib/api.ts` works too — the file location
+is style preference, not load-bearing.
+
 ---
 
-## 8. AgentPage UI (`web/src/pages/AgentPage.tsx`, ~854 lines)
+## 7. AgentPage UI — `plugins/lead_hunter/web/AgentPage.tsx` (~854 lines)
 
 A two-pane layout: a **grid of preset cards** on the left, a
 **preset editor** on the right.
@@ -514,8 +564,8 @@ into the cron page to quickly schedule a run with this preset.
 Plugins can advertise `agentPage: true` in their manifest. Such
 plugins get rendered in a strip above the editor (each as a `<Card>`
 showing its `label` + `description`, link to `/<plugin.tab.path>`).
-The dashboard plugin manifest type already exposes
-`agentPage?: boolean`.
+Add `agentPage?: boolean` to `web/src/plugins/types.ts`'s
+`PluginManifest` (touch-point pinned `merge=ours`).
 
 ### Error UI
 
@@ -533,11 +583,62 @@ If the initial `api.getAgentProfile()` rejects:
 
 ---
 
-## 9. Routing + sidebar
+## 8. Routing + sidebar — Vite alias trick
 
-`web/src/App.tsx`:
+The plugin TSX file lives at
+`plugins/lead_hunter/web/AgentPage.tsx`, **outside** `web/src/`.
+Pull it into the main bundle by aliasing the canonical import path
+in `web/vite.config.ts`:
+
+```ts
+resolve: {
+  alias: [
+    {
+      find: /^@\/pages\/AgentPage$/,
+      replacement: path.resolve(__dirname, "../plugins/lead_hunter/web/AgentPage.tsx"),
+    },
+    // (CronPage alias — see CRON_FEATURE.md)
+    { find: "@", replacement: path.resolve(__dirname, "./src") },
+  ],
+  dedupe: ["react", "react-dom", "@react-three/fiber", "@observablehq/plot",
+           "three", "leva", "gsap"],
+},
+server: {
+  proxy: { "/api": { target: BACKEND, ws: true }, "/dashboard-plugins": BACKEND },
+  fs: { allow: [path.resolve(__dirname, ".."), __dirname] },
+},
+```
+
+Mirror in `web/tsconfig.app.json`:
+
+```json
+"paths": {
+  "@/pages/AgentPage": ["../plugins/lead_hunter/web/AgentPage.tsx"],
+  "@/pages/CronPage":  ["../plugins/lead_hunter/web/CronPage.tsx"],
+  "@/*": ["./src/*"]
+}
+```
+
+Plugin TSX files import bare specifiers (`react`, `react-router-dom`,
+…) which Rollup/Vite resolve from `node_modules` walking up from the
+importing file. Since `plugins/lead_hunter/web/` is outside `web/`,
+add a postinstall hook to `web/package.json`:
+
+```json
+"postinstall": "node -e \"const fs=require('fs'),path=require('path');const link=path.resolve('..','plugins','lead_hunter','web','node_modules');try{fs.lstatSync(link)}catch{fs.symlinkSync(path.resolve('node_modules'),link,'dir');console.log('linked '+link+' -> ../node_modules')}\""
+```
+
+…and gitignore the symlink:
+
+```gitignore
+plugins/lead_hunter/web/node_modules
+```
+
+Then `web/src/App.tsx` (touch-point pinned `merge=ours`) keeps the
+import + nav entry as if AgentPage lived in `src/pages/`:
+
 ```tsx
-import AgentPage from "@/pages/AgentPage";
+import AgentPage from "@/pages/AgentPage";   // resolves to plugin file via alias
 // ...
 const BUILTIN_NAV: NavItem[] = [
   { path: "/", labelKey: "status", label: "Status", icon: Activity },
@@ -559,13 +660,29 @@ this page conceptually. Either:
 
 ---
 
-## 10. Tests to port
+## 9. Tests — `plugins/lead_hunter/tests/`
 
-From `tests/agent/test_agent_presets.py` and the matching cli/web
-test files. Adjust the `default` count in
-`test_list_agent_presets_returns_default_when_none_exist` to match
-the number of built-in templates (currently **4**: default,
-brussels-housing-hunter, flight-finder, lead-hunter).
+Mirror the upstream `tests/` tree. Add this to `pyproject.toml` so
+pytest discovers them:
+
+```toml
+[tool.pytest.ini_options]
+testpaths = ["tests", "plugins/lead_hunter/tests"]
+```
+
+And a one-file `plugins/lead_hunter/tests/conftest.py` that bridges
+the hermetic fixtures from the main `tests/conftest.py`:
+
+```python
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from tests.conftest import *  # noqa: F401,F403,E402
+```
 
 Required coverage:
 - `slugify_agent_name` round-trips for hyphens, spaces, casing.
@@ -578,31 +695,103 @@ Required coverage:
 - `get_active_agent_slug` falls back to "default" when the configured
   slug doesn't exist.
 - `delete_agent_preset("default")` raises `ValueError`.
-- The `/agent/profile` endpoint returns the full payload shape.
+- The `/api/plugins/lead-hunter/agent/profile` endpoint returns the
+  full payload shape.
 - POST/PUT/DELETE/activate routes round-trip correctly.
 - CLI `--agent <slug>` flag and `/agent use <slug>` slash command.
 
+Adjust the count assertion in
+`test_list_agent_presets_returns_default_when_none_exist` to match
+the number of built-in templates (currently **4**: default,
+brussels-housing-hunter, flight-finder, lead-hunter).
+
 ---
 
-## 11. Re-implementation order
+## 10. Final plugin layout
 
-On the fresh branch from main:
+```
+plugins/lead_hunter/
+├── README.md
+├── __init__.py
+├── agent/
+│   ├── __init__.py                     re-exports public API
+│   ├── presets.py                      ~310 LOC engine
+│   └── preset_templates/
+│       ├── brussels-housing-hunter/{AGENT.json, AGENTS.md, SOUL.md}
+│       ├── flight-finder/{AGENT.json, AGENTS.md, SOUL.md}
+│       └── lead-hunter/{AGENT.json, AGENTS.md, SOUL.md}
+├── dashboard/
+│   ├── manifest.json                   plugin descriptor
+│   └── plugin_api.py                   FastAPI router + 6 routes + helpers
+├── web/
+│   ├── AgentPage.tsx                   pulled into web build via Vite alias
+│   ├── CronPage.tsx                    (see CRON_FEATURE.md)
+│   └── styles.css                      custom CSS imported by index.css
+├── env_keys.py                         optional: registers Hunter/Apollo/Airtable env vars
+└── tests/
+    ├── conftest.py                     bridges tests/conftest.py fixtures
+    ├── agent/test_agent_presets.py
+    ├── cli/test_agent_preset_commands.py
+    ├── hermes_cli/test_agent_preset_cli_args.py
+    ├── run_agent/test_agent_preset_identity.py
+    └── hermes_cli/test_agent_preset_routes.py
+```
 
-1. Add `agent/agent_presets.py` + `agent/preset_templates/*` (pure-add,
-   no upstream conflicts).
-2. Patch `agent/prompt_builder.py` to accept `agent_preset` keyword.
-3. Patch `run_agent.py` (`AIAgent.__init__` + system-prompt assembly).
-4. Add `agent.active_preset` to `DEFAULT_CONFIG` in `hermes_cli/config.py`.
-5. Patch `cli.py` for the `--agent` flag + `/agent` slash commands.
-6. Patch `cron/scheduler.py` to pass `job.agent_name` as `agent_preset`.
-7. Add the dashboard plugin scaffold at
-   `plugins/lead_hunter/dashboard/{manifest.json, plugin_api.py}` with
-   the 6 routes + helpers.
-8. Add `web/src/pages/AgentPage.tsx` + the api.ts methods + types.
-9. Wire the route + sidebar in `web/src/App.tsx`.
-10. Hide / remove upstream's `/profiles` tab if present.
-11. Port tests; run `pytest agent/ tests/cli/ tests/hermes_cli/`.
-12. `npm run build`, smoke the dashboard.
+---
 
-The Cron half of this lives in [`CRON_FEATURE.md`](./CRON_FEATURE.md);
-storage paths in [`DATA_LOCATIONS.md`](./DATA_LOCATIONS.md).
+## 11. Shared-file touch-points (`merge=ours` pinned)
+
+Every file in this list keeps a tiny patch from this fork. Pin them
+in `.gitattributes`:
+
+```gitattributes
+agent/prompt_builder.py       merge=ours
+run_agent.py                  merge=ours
+cli.py                        merge=ours
+cron/scheduler.py             merge=ours
+hermes_cli/config.py          merge=ours
+web/src/App.tsx               merge=ours
+web/src/lib/api.ts            merge=ours
+web/src/plugins/types.ts      merge=ours
+web/vite.config.ts            merge=ours
+web/tsconfig.app.json         merge=ours
+web/package.json              merge=ours
+```
+
+Run once per clone:
+```bash
+git config merge.ours.driver true
+```
+
+When upstream actually changes one of these in a way you want to
+absorb, take the upstream version explicitly with
+`git checkout main -- <file>` and re-apply your tiny patch on top.
+
+---
+
+## 12. Re-implementation order (from a fresh main checkout)
+
+1. `mkdir -p plugins/lead_hunter/{agent/preset_templates,dashboard,web,tests}`.
+2. Copy template directories from any existing source (the
+   lead-hunter-custom-backup branch has them at
+   `agent/preset_templates/`):
+   ```bash
+   git checkout lead-hunter-custom-backup-2026-05-05 -- agent/preset_templates/
+   git mv agent/preset_templates plugins/lead_hunter/agent/preset_templates
+   ```
+3. Add `plugins/lead_hunter/agent/presets.py` (the engine) and
+   `__init__.py` (re-exports).
+4. Add the 5 shared-file patches from §4 + §11; pin them with
+   `merge=ours`.
+5. Add `plugins/lead_hunter/dashboard/{manifest.json, plugin_api.py}`
+   with the 6 routes + helpers (§5).
+6. Add `plugins/lead_hunter/web/AgentPage.tsx` (the UI from §7).
+7. Update `web/vite.config.ts`, `web/tsconfig.app.json`,
+   `web/package.json`, and `web/src/App.tsx` per §8.
+8. Extend `web/src/lib/api.ts` with the 6 new methods + types (§6).
+9. Hide upstream's `/profiles` tab (§8).
+10. Port tests from §9; run `pytest plugins/lead_hunter/tests/`.
+11. `npm run build`; smoke the dashboard.
+
+The cron half lives in [`CRON_FEATURE.md`](./CRON_FEATURE.md).
+Storage paths in [`DATA_LOCATIONS.md`](./DATA_LOCATIONS.md).

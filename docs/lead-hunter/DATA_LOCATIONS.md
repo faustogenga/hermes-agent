@@ -1,15 +1,11 @@
 # Data Locations — where presets and cron jobs actually live
 
 Companion to [`AGENTS_FEATURE.md`](./AGENTS_FEATURE.md) and
-[`CRON_FEATURE.md`](./CRON_FEATURE.md). Knowing these paths matters
-because:
-
-- Re-implementing the feature on a fresh branch from main does **not**
-  need to migrate this data — it's already on disk and the new code
-  reads from the same paths.
-- If you nuke `$HERMES_HOME/agents/` you lose all your custom presets.
-- If you nuke `$HERMES_HOME/cron/jobs.json` you lose every scheduled
-  job.
+[`CRON_FEATURE.md`](./CRON_FEATURE.md). This is the **user-data
+contract**: as long as the `lead_hunter` plugin reads from and writes
+to the paths below, with the same JSON / Markdown shapes, future
+upstream merges can rename the plugin code without losing user
+state. This file is the invariant the spec is anchored to.
 
 ---
 
@@ -23,8 +19,7 @@ def get_hermes_home() -> Path:
     return Path(val) if val else Path.home() / ".hermes"
 ```
 
-On this machine: `$HOME = /Users/faust1`, so `HERMES_HOME =
-/Users/faust1/.hermes` unless the env var is set.
+Default: `~/.hermes`.
 
 A profile-mode install (where `hermes profiles use <name>` was run)
 puts `HERMES_HOME` at `~/.hermes/profiles/<name>`. The path lookups
@@ -36,10 +31,10 @@ below stay relative to whatever `get_hermes_home()` returns.
 
 ### Built-in templates (in repo, version-controlled)
 
-Source of truth shipped with the code:
+Source of truth shipped with the plugin:
 
 ```
-agent/preset_templates/
+plugins/lead_hunter/agent/preset_templates/
 ├── brussels-housing-hunter/AGENT.json
 ├── brussels-housing-hunter/AGENTS.md
 ├── brussels-housing-hunter/SOUL.md
@@ -51,17 +46,9 @@ agent/preset_templates/
     lead-hunter/SOUL.md
 ```
 
-When re-implementing, copy these directories from
-`lead-hunter-custom-backup-2026-05-05:agent/preset_templates/` onto
-the new branch.
-
-```bash
-git checkout lead-hunter-custom-backup-2026-05-05 -- agent/preset_templates/
-```
-
-(That command works as long as the destination directory doesn't
-exist on the new branch — same trick we used during Stage 1 of the
-plugin extraction.)
+`agent_presets.list_agent_presets()` resolves `_BUILTIN_TEMPLATE_DIR
+= Path(__file__).parent / "preset_templates"` so the templates load
+automatically when the plugin module is imported.
 
 ### User-created and user-overridden presets
 
@@ -82,12 +69,11 @@ Per-host, **not in git** — lives under `$HERMES_HOME/agents/`:
     └── AGENTS.md
 ```
 
-> On this host, `~/.hermes/agents/` does not exist yet — the user has
-> only the built-in templates active. The dir is created lazily the
-> first time `save_agent_preset()` runs (on `POST /agents` or `PUT
-> /agents/{slug}`).
+> The `~/.hermes/agents/` dir is created lazily the first time
+> `save_agent_preset()` runs — i.e. on `POST /agents` or `PUT
+> /agents/{slug}` from the dashboard.
 
-The default preset's `SOUL.md` is the legacy file at
+The default preset is special: its `SOUL.md` is the legacy file at
 `~/.hermes/SOUL.md`, NOT `~/.hermes/agents/default/SOUL.md`. The
 override directory only carries `AGENT.json` (metadata) and optional
 `AGENTS.md` (project context).
@@ -143,10 +129,6 @@ A JSON list of job dicts. Each entry's relevant fields:
 }
 ```
 
-> On this host, `~/.hermes/cron/` exists but `jobs.json` doesn't —
-> the user has no scheduled jobs at the moment, so re-implementing
-> the feature creates fresh state.
-
 ### Run logs
 
 `~/.hermes/cron/output/` — per-run output capture. Created by the
@@ -169,8 +151,9 @@ interpreted against this TZ. Saving via `PUT /api/config` triggers
 
 ## Memory + identity sources used by AgentPage's source cards
 
-The `/agent/profile` endpoint surfaces four "source" files in addition
-to the preset's own `SOUL.md` / `AGENTS.md`:
+The `/api/plugins/lead-hunter/agent/profile` endpoint surfaces four
+"source" files in addition to the preset's own `SOUL.md` /
+`AGENTS.md`:
 
 | Card key | File path                              | Purpose                                       |
 |----------|----------------------------------------|-----------------------------------------------|
@@ -216,28 +199,25 @@ rm -rf ~/.hermes/agents/ ~/.hermes/cron/jobs.json
 
 After reset, the next `hermes` startup re-creates the directories
 empty; built-in preset templates still load from
-`agent/preset_templates/`.
+`plugins/lead_hunter/agent/preset_templates/`.
 
 ---
 
-## Re-implementation reminder
+## Why these paths matter for the plugin design
 
-When you start the fresh main-based branch:
+The `lead_hunter` plugin can be **renamed**, **rebuilt from scratch**,
+or **temporarily disabled** without affecting the user's saved
+presets and cron jobs. As long as the new code reads the paths above,
+all existing data round-trips. The user data is the durable state;
+the plugin code is replaceable.
 
-1. Copy the source-of-truth template files in:
-   ```bash
-   git checkout lead-hunter-custom-backup-2026-05-05 -- agent/preset_templates/
-   ```
+When implementing per the spec:
+
+1. Built-in templates: ship in
+   `plugins/lead_hunter/agent/preset_templates/` (in repo).
 2. **Don't touch** `~/.hermes/`. The user's existing data (or future
-   data they create) will work with the new code as long as you read
-   from / write to the paths documented here.
-3. Implement code per [`AGENTS_FEATURE.md`](./AGENTS_FEATURE.md) and
-   [`CRON_FEATURE.md`](./CRON_FEATURE.md).
-4. Smoke-test by creating a preset in the dashboard, refreshing, and
+   data they create) will work with the new plugin code as long as
+   you read from / write to the paths documented here.
+3. Smoke-test by creating a preset in the dashboard, refreshing, and
    confirming `~/.hermes/agents/<new-slug>/` appears with the right
    files.
-
-The key invariant: the **filesystem layout above is the user-data
-contract**. As long as the new code reads and writes those exact
-paths with the same JSON / Markdown shapes, the user's existing
-work transfers across rewrites.

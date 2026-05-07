@@ -1,25 +1,23 @@
 # Cron + Agent Wiring — Feature Spec
 
 Companion to [`AGENTS_FEATURE.md`](./AGENTS_FEATURE.md). This doc
-specifies the customizations on top of the upstream cron page that:
+specifies the cron-related half of the **`lead_hunter` plugin** —
+making each scheduled cron job pick which agent preset it runs as,
+plus replacing the dashboard's CronPage with a richer version
+(timeline visualization, schedule builder, timezone control).
 
-1. Let each cron job pick which **agent preset** to run as
-   (`job.agent_name = <slug>`).
-2. Add a **Daily Schedule Map** ("Today's Run Rhythm") visualization.
-3. Add a **schedule-builder** UI for once / twice / three-times-per-day
-   patterns.
-4. Add **timezone persistence** for the cron scheduler.
-
-The upstream `CronPage.tsx` ships a basic list. The fork-local version
-is ~1100 lines longer and gains all of the above.
+Like the agents half, the implementation lives inside
+`plugins/lead_hunter/` so future `git pull upstream main` doesn't
+overwrite it. A handful of one-line touches to upstream files are
+listed in §7 and pinned with `merge=ours`.
 
 ---
 
 ## 1. Data model: cron jobs
 
-### `cron/jobs.py` — fields added by the fork
+### `cron/jobs.py` — `agent_name` field added (PATCH — pinned `merge=ours`)
 
-`create_cron_job(...)` accepts an additional keyword:
+`create_cron_job(...)` accepts an additional keyword and persists it:
 
 ```python
 def create_cron_job(
@@ -53,7 +51,7 @@ def create_cron_job(
 slug** by everything downstream. `"default"` and `None` both mean
 "use the active preset".
 
-### `cron/scheduler.py`
+### `cron/scheduler.py` (PATCH — pinned `merge=ours`)
 
 When dispatching a job:
 ```python
@@ -65,7 +63,12 @@ agent = AIAgent(
 )
 ```
 
-### `tools/cronjob_tools.py`
+That's the only change. The `AIAgent` constructor (patched per
+[`AGENTS_FEATURE.md` §4](./AGENTS_FEATURE.md#4-wiring-into-the-agent-runtime-shared-file-touch-points))
+calls `resolve_agent_preset(...)` which falls back to "default" when
+the slug doesn't exist or is `None`.
+
+### `tools/cronjob_tools.py` (PATCH — pinned `merge=ours`)
 
 The MCP/skill-facing `cronjob` tool exposes `agent_name` on
 **create**, **update**, and **list** so an agent (e.g. one running
@@ -100,14 +103,20 @@ The tool's input JSON schema includes a new property:
 
 ## 2. Backend API additions
 
-The upstream cron API (`/api/cron/jobs`) gains:
+### Two upstream cron routes get extra fields
+
+Pin `hermes_cli/web_server.py` with `merge=ours` so these stay:
 
 | Method | Path                          | Body changes                                       |
 |--------|-------------------------------|----------------------------------------------------|
 | POST   | `/api/cron/jobs`              | `agent_name?: string` accepted                     |
 | PUT    | `/api/cron/jobs/{id}`         | `updates: { agent_name?: string }` accepted        |
 
-The fork-local `web/src/lib/api.ts`:
+(These routes are upstream's; the fork just adds the optional
+`agent_name` to the request models. The persistence layer is
+already covered by §1.)
+
+### Frontend client extensions — `web/src/lib/api.ts` (pinned `merge=ours`)
 
 ```ts
 createCronJob: (job: {
@@ -129,7 +138,7 @@ updateCronJob: (id: string, updates: Record<string, unknown>) =>
 ### Timezone update wiring
 
 When `PUT /api/config` saves a config whose `timezone` field changed,
-the fork triggers cron recompute:
+trigger cron recompute:
 
 ```python
 from cron.jobs import recompute_all_next_runs
@@ -138,19 +147,19 @@ hermes_time.reset_cache()
 recompute_all_next_runs()
 ```
 
-This already lives in upstream's web_server.py post-merge but the
-fork added it earlier (commit `7c72ca73d`). Make sure it's present:
-on timezone change, every job's `next_run_at` is recomputed against
-the new TZ.
+This is a small patch in `hermes_cli/web_server.py` (which is already
+pinned `merge=ours`). On timezone change, every job's `next_run_at` is
+recomputed against the new TZ.
 
-`hermes_time.py` adds a `reset_cache()` helper plus respects
-`config.timezone` for `_hermes_now()`.
+`hermes_time.py` (also pinned `merge=ours`) needs a `reset_cache()`
+helper plus respect for `config.timezone` in `_hermes_now()`.
 
 ---
 
 ## 3. CronJob TS interface
 
-`web/src/lib/api.ts`:
+`web/src/lib/api.ts` (pinned `merge=ours`) — add the field:
+
 ```ts
 export interface CronJob {
   id: string;
@@ -170,7 +179,22 @@ export interface CronJob {
 
 ---
 
-## 4. CronPage UI (`web/src/pages/CronPage.tsx`, ~1100 fork lines)
+## 4. CronPage UI — `plugins/lead_hunter/web/CronPage.tsx` (~1100 LOC)
+
+Pulled into the main bundle via the same Vite alias trick as
+`AgentPage.tsx` (see [`AGENTS_FEATURE.md` §8](./AGENTS_FEATURE.md#8-routing--sidebar--vite-alias-trick)).
+Add to `web/vite.config.ts`:
+
+```ts
+{
+  find: /^@\/pages\/CronPage$/,
+  replacement: path.resolve(__dirname, "../plugins/lead_hunter/web/CronPage.tsx"),
+},
+```
+
+…and the matching `tsconfig.app.json` paths entry. With both
+aliases present, `web/src/App.tsx`'s `import CronPage from
+"@/pages/CronPage"` resolves into the plugin file.
 
 ### Layout
 
@@ -262,7 +286,9 @@ preset-tinted theme:
 - default → neutral steel
 
 Each theme exports CSS class strings for card / bubble / badge / pill
-/ status / timeline-bar / action-button styling.
+/ status / timeline-bar / action-button styling. CSS lives in
+`plugins/lead_hunter/web/styles.css` (imported once from
+`web/src/index.css`).
 
 ### Schedule builder
 
@@ -322,16 +348,15 @@ Each `<Card>` shows:
 ```ts
 const [presets, setPresets] = useState<AgentPresetSummary[]>([]);
 ```
-Loaded once on mount via `api.getAgents()`. If empty, fall back to
-`[{ slug: "default", name: "Default" }]`.
+Loaded once on mount via `api.getAgents()` (which hits
+`/api/plugins/lead-hunter/agents` per `AGENTS_FEATURE.md` §6). If
+empty, fall back to `[{ slug: "default", name: "Default" }]`.
 
 ---
 
 ## 5. Custom CSS
 
-`web/src/index.css` gains ~198 fork-local lines (port to a separate
-file like `plugins/lead_hunter/web/styles.css` and `@import` it from
-`web/src/index.css`):
+`plugins/lead_hunter/web/styles.css` (~198 lines):
 
 - `.cron-meta-chip` / `.cron-meta-chip-pastel` — small pill chips for
   status info
@@ -343,40 +368,69 @@ file like `plugins/lead_hunter/web/styles.css` and `@import` it from
 - Agent-page-specific classes (`agent-card`, `agent-card-active`,
   `agent-mascot`, `agent-emoji-picker`, etc.).
 
----
+Imported once from `web/src/index.css`:
+```css
+@import "../../plugins/lead_hunter/web/styles.css";
+```
 
-## 6. Tests to port
-
-From `tests/cron/test_jobs.py`, `tests/cron/test_scheduler.py`,
-`tests/tools/test_cronjob_tools.py`:
-
-- `create_cron_job(..., agent_name="lead-hunter")` persists the
-  field.
-- `cronjob` tool create + update flows for `agent_name`.
-- Scheduler: when running a job with `agent_name="X"`, the spawned
-  `AIAgent` has `agent_preset_slug == "X"`.
-- `PUT /api/config` recomputes cron next_run_at when timezone
-  changes (existing test —
-  `test_put_config_recomputes_cron_runs_when_timezone_changes`).
+(`web/src/index.css` is pinned `merge=ours` since this single import
+line is fork-local.)
 
 ---
 
-## 7. Re-implementation order
+## 6. Tests — `plugins/lead_hunter/tests/`
+
+Add to the existing plugin tests (covered by `AGENTS_FEATURE.md` §9):
+
+- `tests/cron/test_jobs.py` — `create_cron_job(...,
+  agent_name="lead-hunter")` persists the field.
+- `tests/cron/test_scheduler.py` — when running a job with
+  `agent_name="X"`, the spawned `AIAgent` has `agent_preset_slug ==
+  "X"`.
+- `tests/tools/test_cronjob_tools.py` — `cronjob` tool create + update
+  flows for `agent_name`.
+- `tests/hermes_cli/test_web_server.py` — `PUT /api/config`
+  recomputes cron next_run_at when timezone changes.
+
+---
+
+## 7. Shared-file touch-points (pinned `merge=ours`)
+
+This spec adds these files to the pin list (the agents spec covers
+the rest):
+
+```gitattributes
+cron/jobs.py                  merge=ours
+cron/scheduler.py             merge=ours
+tools/cronjob_tools.py        merge=ours
+hermes_time.py                merge=ours
+hermes_cli/web_server.py      merge=ours    (timezone-recompute hook)
+web/src/index.css             merge=ours    (one @import line)
+```
+
+(See [`AGENTS_FEATURE.md` §11](./AGENTS_FEATURE.md#11-shared-file-touch-points-mergeours-pinned)
+for the full pin list.)
+
+---
+
+## 8. Re-implementation order
 
 1. Patch `cron/jobs.py` to accept and persist `agent_name`.
 2. Patch `cron/scheduler.py` to forward it to `AIAgent`.
 3. Patch `tools/cronjob_tools.py` to expose `agent_name` in
    create/update/list + JSON schema.
-4. Patch `hermes_cli/web_server.py` (or your plugin's `plugin_api.py`)
-   so PUT `/api/config` triggers `recompute_all_next_runs()` +
-   `hermes_time.reset_cache()` on TZ change.
-5. Patch `web/src/lib/api.ts`: `createCronJob` adds `agent_name`,
+4. Patch `hermes_cli/web_server.py` so `PUT /api/config` triggers
+   `recompute_all_next_runs()` + `hermes_time.reset_cache()` on TZ
+   change.
+5. Add `hermes_time.reset_cache()` helper if not present.
+6. Patch `web/src/lib/api.ts`: `createCronJob` adds `agent_name`,
    `updateCronJob` is added, `CronJob` interface gains `agent_name`.
-6. Replace `web/src/pages/CronPage.tsx` with the fork version (or
-   alias it to `plugins/lead_hunter/web/CronPage.tsx`). Move the
-   custom CSS chunk into a separate stylesheet imported from
-   `index.css`.
-7. Add the corresponding tests.
-8. `npm run build`, smoke the dashboard.
+7. Add `plugins/lead_hunter/web/CronPage.tsx` (the full UI).
+8. Add the Vite + tsconfig alias for `@/pages/CronPage` (per §4).
+9. Move custom CSS into `plugins/lead_hunter/web/styles.css` and
+   `@import` it from `web/src/index.css`.
+10. Pin the new files in `.gitattributes` (§7).
+11. Port the cron tests from §6.
+12. `npm run build`; smoke the dashboard.
 
 Storage paths in [`DATA_LOCATIONS.md`](./DATA_LOCATIONS.md).
