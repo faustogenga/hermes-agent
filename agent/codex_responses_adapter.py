@@ -23,6 +23,55 @@ from agent.prompt_builder import DEFAULT_AGENT_IDENTITY
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Codex-specific tool-parameter schema sanitization
+# ---------------------------------------------------------------------------
+# OpenAI Codex (chatgpt.com/backend-api/codex) rejects function ``parameters``
+# whose top level uses ``oneOf`` / ``anyOf`` / ``allOf`` / ``enum`` / ``not``,
+# returning HTTP 400 ``invalid_function_parameters``. Standard OpenAI/Anthropic
+# accept these — Hermes uses ``allOf`` (with ``if/then``) on the ``memory``
+# tool's parameters to express conditional ``required`` per action, for
+# example. Codex won't take it.
+#
+# This sanitizer strips those keywords ONLY at the top level of each tool's
+# parameters dict. Nested usage (e.g. ``enum`` inside a property) is left
+# alone — Codex accepts that.
+_TOP_LEVEL_FORBIDDEN_KEYS = ("oneOf", "anyOf", "allOf", "enum", "not")
+
+
+def sanitize_codex_tool_parameters(parameters: Any) -> Dict[str, Any]:
+    """Return a copy of *parameters* safe to send to the Codex Responses API.
+
+    Drops the five top-level schema combinators Codex's validator forbids.
+    Returns the input unchanged if it's not a dict or if no offending keys
+    are present.
+    """
+    if not isinstance(parameters, dict):
+        return parameters
+    if not any(key in parameters for key in _TOP_LEVEL_FORBIDDEN_KEYS):
+        return parameters
+    cleaned = {k: v for k, v in parameters.items() if k not in _TOP_LEVEL_FORBIDDEN_KEYS}
+    return cleaned
+
+
+def sanitize_codex_tools(tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Apply ``sanitize_codex_tool_parameters`` to every tool's parameters."""
+    if not isinstance(tools, list):
+        return tools
+    out: List[Dict[str, Any]] = []
+    for tool in tools:
+        if not isinstance(tool, dict):
+            out.append(tool)
+            continue
+        params = tool.get("parameters")
+        cleaned_params = sanitize_codex_tool_parameters(params)
+        if cleaned_params is params:
+            out.append(tool)
+        else:
+            out.append({**tool, "parameters": cleaned_params})
+    return out
+
+
 # Matches Codex/Harmony tool-call serialization that occasionally leaks into
 # assistant-message content when the model fails to emit a structured
 # ``function_call`` item.  Accepts the common forms:
@@ -657,13 +706,17 @@ def _preflight_codex_api_kwargs(
             if not isinstance(strict, bool):
                 strict = bool(strict)
 
+            # Codex rejects oneOf/anyOf/allOf/enum/not at the top level of
+            # function parameters. Strip them — nested usage is fine.
+            sanitized_parameters = sanitize_codex_tool_parameters(parameters)
+
             normalized_tools.append(
                 {
                     "type": "function",
                     "name": name.strip(),
                     "description": description,
                     "strict": strict,
-                    "parameters": parameters,
+                    "parameters": sanitized_parameters,
                 }
             )
 
