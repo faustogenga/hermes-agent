@@ -1,0 +1,13 @@
+{
+  "name": "fg-hermes",
+  "label": "FG Hermes",
+  "description": "Custom agent presets and preset-aware cron scheduling.",
+  "icon": "Bot",
+  "version": "1.0.0",
+  "tab": {
+    "path": "/fg-hermes",
+    "hidden": true,
+    "position": "end"
+  },
+  "api": "plugin_api.py"
+}
