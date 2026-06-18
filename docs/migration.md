@@ -28,6 +28,8 @@ At the time this migration kit was created:
 - Known profiles:
   - `default`
   - `lead-hunter-brussels`
+- Current local migration artifact directory:
+  - `/home/ubuntu/.hermes/backups/migration-20260618-082251`
 
 When doing a production migration, prefer a **tag or pinned commit** over a floating branch.
 
@@ -47,7 +49,8 @@ Create these on the source server before migration:
 ### 1. Full Hermes backup
 
 ```bash
-hermes backup -o ~/hermes-backup-full.zip
+mkdir -p ~/.hermes/backups/migration-20260618-082251
+hermes backup -o ~/.hermes/backups/migration-20260618-082251/hermes-backup-full.zip
 ```
 
 This is the main disaster-recovery artifact.
@@ -55,8 +58,8 @@ This is the main disaster-recovery artifact.
 ### 2. Optional per-profile archives
 
 ```bash
-hermes profile export default -o ~/default-profile.tar.gz
-hermes profile export lead-hunter-brussels -o ~/lead-hunter-brussels-profile.tar.gz
+hermes profile export default -o ~/.hermes/backups/migration-20260618-082251/default-profile.tar.gz
+hermes profile export lead-hunter-brussels -o ~/.hermes/backups/migration-20260618-082251/lead-hunter-brussels-profile.tar.gz
 ```
 
 Use these when you want profile-level import/export instead of a whole-home restore.
@@ -96,14 +99,15 @@ If you have other uncommitted local code changes you want preserved, commit and 
 ### B. Create a full backup
 
 ```bash
-hermes backup -o ~/hermes-backup-full.zip
+mkdir -p ~/.hermes/backups/migration-20260618-082251
+hermes backup -o ~/.hermes/backups/migration-20260618-082251/hermes-backup-full.zip
 ```
 
 ### C. Optionally export profiles
 
 ```bash
-hermes profile export default -o ~/default-profile.tar.gz
-hermes profile export lead-hunter-brussels -o ~/lead-hunter-brussels-profile.tar.gz
+hermes profile export default -o ~/.hermes/backups/migration-20260618-082251/default-profile.tar.gz
+hermes profile export lead-hunter-brussels -o ~/.hermes/backups/migration-20260618-082251/lead-hunter-brussels-profile.tar.gz
 ```
 
 ### D. Record the exact git ref
@@ -167,7 +171,7 @@ cd ~/.hermes/hermes-agent
   --target-dir ~/.hermes/hermes-agent \
   --hermes-home ~/.hermes \
   --repo-ref 860cf5133a7961e71191de9cf0ac5ea130bfab61 \
-  --backup-zip ~/hermes-backup-full.zip
+  --backup-zip ~/.hermes/backups/migration-20260618-082251/hermes-backup-full.zip
 ```
 
 Example with profile archives instead of a full backup:
@@ -178,9 +182,19 @@ cd ~/.hermes/hermes-agent
   --target-dir ~/.hermes/hermes-agent \
   --hermes-home ~/.hermes \
   --repo-ref 860cf5133a7961e71191de9cf0ac5ea130bfab61 \
-  --profile-archive ~/default-profile.tar.gz \
-  --profile-archive ~/lead-hunter-brussels-profile.tar.gz
+  --profile-archive ~/.hermes/backups/migration-20260618-082251/default-profile.tar.gz \
+  --profile-archive ~/.hermes/backups/migration-20260618-082251/lead-hunter-brussels-profile.tar.gz
 ```
+
+## Actual local artifacts created on this server
+
+These were created locally and intentionally **not committed to git**:
+
+- `~/.hermes/backups/migration-20260618-082251/hermes-backup-full.zip`
+- `~/.hermes/backups/migration-20260618-082251/default-profile.tar.gz`
+- `~/.hermes/backups/migration-20260618-082251/lead-hunter-brussels-profile.tar.gz`
+
+Use them directly during migration from secure local or encrypted storage. If you move them off-machine, treat them as sensitive credentials/state archives.
 
 ## 5. Verify the rebuild
 
