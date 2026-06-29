@@ -41,6 +41,9 @@ This repo now includes:
 - `scripts/bootstrap_server.sh`
 - `scripts/verify_install.sh`
 - `.env.template`
+- `migration-artifacts/hermes-state-snapshot-2026-06-29/`
+
+The Hermes-state snapshot is a non-secret export of important local state that normally lives outside the git checkout, including the cron registry and selected helper scripts used by the current Brussels/padel workflows.
 
 ## Recommended backup artifacts
 

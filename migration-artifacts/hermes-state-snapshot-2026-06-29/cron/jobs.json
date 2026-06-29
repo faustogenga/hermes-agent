@@ -1,0 +1,673 @@
+{
+  "jobs": [
+    {
+      "id": "548f02dad753",
+      "name": "brussels-daily-leads",
+      "prompt": "Market:\n- Country: Belgium\n- City: Brussels\n\nFind up to 5 verified NEW local SMB lead opportunities for a web/app development agency.\n\nUse the attached skill strictly.\n\nOperating workflow:\n1. Google Places first for official place records.\n2. Tavily for broader discovery.\n3. Firecrawl when available for website extraction and difficult pages.\n4. Jina for website inspection when Firecrawl is not enough.\n5. Browser Google Maps only as corroboration.\n6. Hunter only after the business is already verified as a good lead.\n7. Apollo only if accessible on the current plan.\n\nPersistence workflow:\n- Deduplicate against the local ledger first.\n- Persist verified new leads.\n- Sync Airtable when configured.\n\nKeep the TELEGRAM MESSAGE VERY SHORT.\nReturn only:\n- a 1-line status header\n- up to 3 very short bullets for the best new leads\n- a final compact metrics line\n\nFormat exactly like this:\nBrussels leads: <new_count> new / <skipped_count> skipped\n\u2022 <Business> \u2014 <very short issue> \u2014 <score>/10\n\u2022 <Business> \u2014 <very short issue> \u2014 <score>/10\n\u2022 <Business> \u2014 <very short issue> \u2014 <score>/10\nPersisted: <yes/no> | Airtable: <yes/no> | Blocker: <short blocker or none>\n\nRules:\n- Max 3 lead bullets even if you found more.\n- Keep each bullet under ~90 characters.\n- No long explanations, no sections, no essays.\n- If zero verified leads are found, still send only 2 lines:\n  Brussels leads: 0 new / <skipped_count> skipped\n  Persisted: <yes/no> | Airtable: <yes/no> | Blocker: <short blocker>\n- Never end with [SILENT].",
+      "skills": [
+        "local-business-opportunity-finder"
+      ],
+      "skill": "local-business-opportunity-finder",
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "lead_hunter_context.py",
+      "schedule": {
+        "kind": "cron",
+        "expr": "00 6 * * *",
+        "display": "00 6 * * *"
+      },
+      "schedule_display": "00 6 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 76
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-04-17T13:18:15.765270+00:00",
+      "next_run_at": "2026-06-30T06:00:00+02:00",
+      "last_run_at": "2026-06-29T06:13:21.385372+02:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "telegram:Fausto Genga (dm)",
+      "origin": null,
+      "agent_name": "lead-hunter"
+    },
+    {
+      "id": "628deedb3571",
+      "name": "housing-brussels-2p",
+      "prompt": "Use the dedicated Brussels Housing Hunter preset for this run.\n\nTarget:\n- City: Brussels\n- Household size: 2 people\n- Bedrooms: 2 to 3 bedrooms\n- Budget: \u20ac400 to \u20ac700 per person\n- Total monthly rent target: \u20ac800 to \u20ac1400\n- Move-in target: September\n- Also accept August-start listings if they look strong; mark them as potentially negotiable for September rather than assuming it.\n- Furnishing: furnished or semi-furnished\n- Lease type: long-term only\n- Minimum stay target: prefer 6+ months; accept 5 months minimum if the listing is otherwise strong\n- Exclude short-stay, vacation-style, nightly, weekly, or clearly temporary listings\n- Area coverage: all Brussels areas are allowed; do not over-filter by neighborhood because the user will judge later.\n\nSearch objective:\nFind the best NEW review-worthy apartment listings for 2 people in Brussels. Prefer quality over quantity. Search major rental/listing sources and prioritize official listing pages. Use Firecrawl when available for search, scraping, and extraction on listing sites, especially where direct browser automation is flaky or blocked. For Immoweb, Immovlan, Zimmo, HousingAnywhere, Spotahome, Trovit, Rentola, and Appartager, try Firecrawl first before browser fallback whenever feasible.\n\nSource priority list:\n1. Immoweb\n2. Immovlan\n3. Zimmo\n4. HousingAnywhere\n5. Facebook Marketplace\n6. Spotahome\n7. Trovit\n8. Rentola\n9. Appartager\n\nUse at least the first 5 whenever possible before falling back to weaker sources. Treat Trovit as a discovery aggregator and prefer the original listing URL when available.\n\nCoverage requirement:\n- Do not rely on a single source if other priority sites are accessible.\n- Attempt searches on Immoweb, Immovlan, Zimmo, HousingAnywhere, and Facebook Marketplace on every run when feasible.\n- If one or more priority sites are blocked, empty, or low quality, note that briefly in your blocker text.\n- Prefer source diversity in the final shortlist when quality is comparable.\n- Do not fill the whole shortlist from one site unless it is clearly the only grounded source producing strong long-term matches.\n\nRanking logic:\nUse your judgment to rank what looks genuinely great or good enough for review. Consider price per person, total rent, fit for 2 people, bedroom count, furnishing level, apparent neighborhood quality, listing completeness, and overall practicality.\n\nAvailability highlighting:\n- Prefer listings that explicitly show August or September availability.\n- If a listing is available in August or September, treat that as a positive ranking signal and highlight it in the final shortlist.\n- If availability is August, label it clearly as August and note it may be negotiable for a September move if appropriate.\n- Include a simple 10-point score for each shortlisted listing.\n\nAirtable persistence requirement before your final response:\n1. Run: `python3 ~/.hermes/scripts/housing_tracker_airtable.py ensure-table --table 'Housing Brussels 2p'`\n2. Run: `python3 ~/.hermes/scripts/housing_tracker_airtable.py ensure-summary-table`\n3. Run: `python3 ~/.hermes/scripts/housing_tracker_airtable.py ensure-coverage-table`\n4. Write a JSON payload file with this shape for the best up to 5 NEW listings:\n   {\n     \"run_key\": \"housing-brussels-2p:<ISO timestamp>\",\n     \"recorded_at\": \"<ISO timestamp>\",\n     \"job_name\": \"housing-brussels-2p\",\n     \"city\": \"Brussels\",\n     \"household_size\": 2,\n     \"listings\": [\n       {\n         \"listing_key\": \"<stable url or source id>\",\n         \"title\": \"<listing title>\",\n         \"source\": \"<site>\",\n         \"listing_url\": \"<url>\",\n         \"area\": \"<area if known>\",\n         \"address\": \"<address if known>\",\n         \"bedrooms\": <number or omit>,\n         \"furnished\": \"<furnished/semi-furnished/unknown>\",\n         \"monthly_rent_eur\": <number>,\n         \"price_per_person_eur\": <number>,\n         \"available_from\": \"<date/text if known>\",\n         \"lease_type\": \"<text if known>\",\n         \"score\": <0-10 number>,\n         \"fit_summary\": \"<short why this is worth review>\",\n         \"concerns\": \"<short caveats or missing details>\"\n       }\n     ]\n   }\n4. Run: `python3 ~/.hermes/scripts/housing_tracker_airtable.py upsert-listings --table 'Housing Brussels 2p' --payload-file <payload_file>`\n5. Write a summary JSON payload with this shape:\n   {\n     \"run_key\": \"housing-brussels-2p:<same ISO timestamp>\",\n     \"recorded_at\": \"<same ISO timestamp>\",\n     \"job_name\": \"housing-brussels-2p\",\n     \"table_name\": \"Housing Brussels 2p\",\n     \"household_size\": 2,\n     \"reviewed_count\": <count of listings reviewed closely>,\n     \"new_count\": <count inserted/kept for this report>,\n     \"sent_count\": <count included in telegram summary>,\n     \"summary_message\": \"<exact telegram message text>\",\n     \"blocker\": \"<short blocker or none>\"\n   }\n6. Run: `python3 ~/.hermes/scripts/housing_tracker_airtable.py upsert-summary --payload-file <summary_payload_file>`\n7. Write a coverage JSON payload with this shape:\n   {\n     \"run_key\": \"<same run key>\",\n     \"recorded_at\": \"<same ISO timestamp>\",\n     \"job_name\": \"<job name>\",\n     \"table_name\": \"<Airtable listings table name>\",\n     \"household_size\": <2 or 3>,\n     \"attempted_sources\": [\"Immoweb\", \"Immovlan\", \"Zimmo\", \"HousingAnywhere\", \"Facebook Marketplace\", \"Spotahome\", \"Trovit\", \"Rentola\", \"Appartager\"],\n     \"accessible_sources\": [\"<sources that actually loaded or produced searchable results>\"],\n     \"shortlisted_sources\": [\"<sources represented in the shortlisted listings>\"],\n     \"blocked_sources\": [\"<sources blocked, empty, or unusable this run>\"],\n     \"coverage_notes\": \"<very short note about source coverage and why one site may have dominated if it did>\"\n   }\n8. Run: `python3 ~/.hermes/scripts/housing_tracker_airtable.py upsert-coverage --payload-file <coverage_payload_file>`\n\nTelegram output:\nKeep the TELEGRAM MESSAGE SHORT.\nReturn only:\nBrussels housing 2p: <new_count> strong options\n\u2022 <Area> \u2014 \u20ac<rent>/mo \u2014 <bedrooms>br \u2014 <availability tag> \u2014 <score>/10\n\u2022 <Area> \u2014 \u20ac<rent>/mo \u2014 <bedrooms>br \u2014 <availability tag> \u2014 <score>/10\n\u2022 <Area> \u2014 \u20ac<rent>/mo \u2014 <bedrooms>br \u2014 <availability tag> \u2014 <score>/10\nAirtable: <ok/fail> | Sources: <shortlisted source names> | Blocker: <short blocker or none>\n\nRules:\n- Max 5 lines total.\n- Max 3 bullets even if you found more.\n- Only include listings grounded in actual listing pages.\n- Only include long-term listings; exclude short-stay or temporary inventory.\n- Do not guess missing details.\n- If zero strong options are found, return only 2 lines:\n  Brussels housing 2p: 0 strong options\n  Airtable: <ok/fail> | Blocker: <short blocker>\n- Never end with [SILENT].",
+      "skills": [],
+      "skill": null,
+      "agent_name": "brussels-housing-hunter",
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "00 7 * * *",
+        "display": "00 7 * * *"
+      },
+      "schedule_display": "00 7 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 43
+      },
+      "enabled": false,
+      "state": "paused",
+      "paused_at": "2026-06-05T11:14:29.216019+02:00",
+      "paused_reason": null,
+      "created_at": "2026-04-28T08:43:15.549182+00:00",
+      "next_run_at": "2026-06-06T07:00:00+02:00",
+      "last_run_at": "2026-06-05T07:30:43.104974+02:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "telegram",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "8667992401",
+        "chat_name": "Fausto Genga",
+        "thread_id": null
+      }
+    },
+    {
+      "id": "47a277b40fed",
+      "name": "flights-madrid-costa-rica-daily",
+      "prompt": "Use the dedicated Flight Finder preset for this run.\n\nMonitor round-trip flights from Madrid to Costa Rica with these rules:\n- Origin airport: MAD only\n- Destination airports: SJO and LIR only\n- Any airport combination is allowed, including open-jaw if the value is clearly better\n- Passenger count: 1 adult\n- Cabin: economy\n- Bags: carry-on only\n- Travel objective: find the best value trip that is cheapest overall without absurd travel times\n- Ranking priority:\n  1. cheapest total price\n  2. avoid crazy total travel hours / impractical itineraries\n  3. lower stop count when comparable\n\nDate constraints:\n- Departure must be between 2026-08-01 and 2026-08-15 inclusive\n- Stay length target: 10 days\n- Return can drift by at most about 1 day when needed to surface the best grounded option, but keep the search centered on true 10-day trips\n\nSearch workflow:\n1. Use Google Flights first and go deep before giving up.\n2. Systematically check MAD against SJO and LIR inside the allowed window.\n3. Prefer Google exact-date results when they load; if the results pane is flaky, use the date grid, price graph, and calendar aggressively.\n4. Re-check normalized dates after edits/clicks so Google does not silently rewrite the trip.\n5. Use Firecrawl-backed extraction on blocked OTA pages whenever available, especially for Skyscanner and KAYAK exact-date pages.\n6. If Firecrawl credits are unavailable or exhausted, say so briefly and move on instead of burning turns retrying the same blocked extractor loop.\n7. Use at least one backup source when feasible, but do not waste the run chasing multiple blocked OTA sites once Google has already produced grounded options.\n8. Persist the top 1 to 3 grounded options to Airtable as soon as they are ready, before spending remaining turns on extra corroboration.\n\nAirtable persistence requirement before your final response:\n1. Run: `AIRTABLE_FLIGHTS_TABLE='Flight Tracker Costa Rica August' python3 ~/.hermes/scripts/flight_tracker_airtable.py ensure-table`\n2. Save a JSON payload to a temporary file.\n3. Run: `AIRTABLE_FLIGHTS_TABLE='Flight Tracker Costa Rica August' python3 ~/.hermes/scripts/flight_tracker_airtable.py upsert --payload-file <that_file>`\n4. If Airtable write fails, say exactly why in the last line.\n\nPayload keys must include:\n- run_key\n- recorded_at\n- job_name = flights-madrid-costa-rica-daily\n- route_key = madrid-costa-rica-august\n- route_label = Madrid (MAD) \u2194 Costa Rica (SJO/LIR) | Aug 1-15 departures | 10-day stay\n- origin_airport = MAD\n- destination_airport = SJO/LIR\n- currency = EUR\n- observations = top 1 to 3 grounded options\n\nFor each observation include when available:\n- observation_key\n- price_eur\n- departure_date\n- return_date\n- airlines\n- stops\n- duration_summary\n- source\n- backup_sources\n- fare_assessment\n- booking_url\n- notes\n\nOutput for Telegram:\nKeep it short and useful.\nReturn only:\nCosta Rica flights: <best price or no solid fare>\n\u2022 Best: <origin> \u2192 <destination> | <outbound date> \u2192 <return date> | \u20ac<price> | <stops or note> | <duration or practicality note>\n\u2022 Alt: <second-best option if worthwhile>\n\u2022 Airtable: <ok/fail> | Table: Flight Tracker Costa Rica August | Notes: <very short note>\n\nRules:\n- Prefer grounded exact-date evidence over generic route pages.\n- Do not invent airline/stop/duration details if the source did not expose them.\n- If nothing solid is available, say so briefly and mention the blocker.\n- Firecrawl availability is important, but Google Flights remains the primary source and should be used deeply every run.\n- The final response should be suitable for direct delivery in this Telegram chat.",
+      "skills": [
+        "flight-fare-monitoring"
+      ],
+      "skill": "flight-fare-monitoring",
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "flight_monitor_context.py",
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 * * *",
+        "display": "0 9 * * *"
+      },
+      "schedule_display": "0 9 * * *",
+      "repeat": {
+        "times": 9999,
+        "completed": 38
+      },
+      "enabled": false,
+      "state": "paused",
+      "paused_at": "2026-06-03T09:16:56.018172+02:00",
+      "paused_reason": null,
+      "created_at": "2026-04-29T13:35:54.681859+00:00",
+      "next_run_at": "2026-06-04T09:00:00+02:00",
+      "last_run_at": "2026-06-03T09:15:19.428962+02:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "8667992401",
+        "chat_name": "Fausto Genga",
+        "thread_id": null
+      },
+      "agent_name": "flight-finder"
+    },
+    {
+      "id": "57680d9f82f8",
+      "name": "brussels-lead-enrichment",
+      "prompt": "Use Airtable as the control tower and Dropbox App Folder as the final dossier archive.\n\nYou are enriching exactly one queued Brussels lead per run into a grounded dossier suitable for outreach and website/app opportunity assessment.\n\nWorkflow:\n1. Pick exactly one pending lead from the Airtable Leads table, oldest First Seen At first.\n2. Build a grounded dossier using Google Places details, search verification, website extraction, and browser corroboration when needed.\n3. Save dossier artifacts locally.\n4. Sync the dossier folder to the Dropbox App Folder when Dropbox is available.\n5. Update Airtable with dossier URL, enrichment status, findings, confidence, and blocker information.\n\nConstraints:\n- One lead only per run.\n- Airtable queue order must remain oldest-to-newest by First Seen At.\n- Keep claims conservative and grounded.\n- If Dropbox is blocked, report the blocker clearly and do not claim archival succeeded.\n- End with a concise Telegram summary.",
+      "skills": [
+        "local-business-opportunity-finder"
+      ],
+      "skill": "local-business-opportunity-finder",
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": "lead_enrichment_context.py",
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 11 * * *",
+        "display": "0 11 * * *"
+      },
+      "schedule_display": "0 11 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 41
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-05-23T09:27:40.817405+02:00",
+      "next_run_at": "2026-06-30T11:00:00+02:00",
+      "last_run_at": "2026-06-29T11:03:05.496707+02:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "telegram",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "8667992401",
+        "chat_name": "Fausto Genga",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "web",
+        "browser",
+        "terminal",
+        "file",
+        "skills"
+      ],
+      "workdir": null
+    },
+    {
+      "id": "a75c797f9081",
+      "name": "global-padel-coach-jobs-daily",
+      "prompt": "You are running a daily global job hunt for padel coaching roles.\n\nMission:\nFind NEW or still-active job offers from around the world for padel clubs, academies, resorts, federations, and sports centers that are hiring for padel coaching roles.\n\nCritical duplicate rule:\n- Airtable is the source of truth for what is already in the list.\n- Do not treat an already-listed job as new just because you found it again on a later run.\n- Only count a job as NEW if it is not already present in Airtable.\n- Existing jobs can be refreshed/updated, but they should not be counted as newly added jobs.\n- Before calling a result NEW, compare it against Airtable by canonical URL, job URL, and normalized role-family + club/employer + location.\n- If a job-board page, translated title, accented/unaccented spelling, or Spanish/English phrasing appears to describe the same underlying opening as an existing Airtable row, treat it as an update to the existing row, not a new row.\n- Only keep two same-employer same-location coaching rows if the sources show a clear differentiator such as a different stable posting URL, a different specialty/level, a different requisition, or explicit evidence they are separate openings.\n\nTarget roles:\n- padel coach\n- head padel coach\n- padel head coach\n- senior padel coach\n- assistant padel coach\n- padel instructor\n- director of padel\n- padel academy coach\n\nImportant exclusions:\n- NEVER include results from thenet-padel.com\n- reject tennis-only roles unless the page explicitly shows padel is part of the job\n- reject pickleball-only roles\n- reject generic fitness/sports jobs with no real evidence of padel\n- reject aggregator spam pages with no readable underlying job details\n\nSource strategy:\nSearch broadly across major job sites, ATS pages, search-engine-discovered pages, and direct club/federation/resort websites.\nPrioritize sources such as:\n- LinkedIn Jobs\n- Indeed\n- Glassdoor\n- Jooble\n- Talent.com\n- Google-discovered career pages\n- Greenhouse\n- Lever\n- Workable\n- Teamtailor\n- SmartRecruiters\n- Ashby\n- Recruitee\n- direct padel club, academy, federation, resort, and racket-club websites\n\nSearch globally, not just one country. Vary the searches by role and geography.\n\nExecution rules:\n1. Use web_search first for broad discovery.\n2. Use web_extract to read candidate pages when possible.\n3. Use browser tools as fallback for pages that need interaction or better rendering.\n4. Prefer grounded, readable source pages over thin aggregator snippets.\n5. For each accepted result, confirm there is explicit or strong evidence that the role is truly about padel.\n6. Collect up to 15 high-confidence jobs per run.\n7. If the same job appears on multiple sites, keep the best original/most informative URL.\n8. Treat the run as successful even if you find zero jobs; do not invent matches.\n\nContact enrichment rules:\n- For each accepted result, try to enrich the row with the hiring club/organization's direct contact details when they are publicly visible and grounded.\n- Fill these fields when available:\n  - Email\n  - Phone Number\n  - Instagram\n  - Facebook\n  - Other\n- Only use contact details that clearly belong to the actual club/organization trying to hire the padel coach.\n- Do NOT copy contact details from agencies, recruiters, generic job boards, listing mirrors, or intermediaries unless the page clearly shows they are the actual hiring organization.\n- If the listing is posted by an agency/intermediary and the real club/organization is not identified or its own contact details are not exposed, leave Email, Phone Number, Instagram, Facebook, and Other blank.\n- Prefer official club/org sources for contact enrichment: the employer's own website, contact page, footer, about page, official Instagram/Facebook pages, or other clearly official profiles.\n- Instagram should contain only the official Instagram profile URL/handle for the hiring club/org when grounded. Facebook should contain only the official Facebook profile URL/handle when grounded. Other should contain a concise semicolon-separated list of other official profiles such as LinkedIn, TikTok, YouTube, or X when grounded.\n- If a phone number or email appears only for the recruiter/agency and not the club/org, leave the field blank.\n- Do not guess or infer contact details.\n\nAirtable destination:\n- Write to base ID appFiBKeB4uE6os5e.\n- Write to table ID tblnAtmjNbrHI02OT (Global Padel Coach Jobs).\n- Use the helper script already present on disk:\n  AIRTABLE_PADEL_BASE_ID=appFiBKeB4uE6os5e AIRTABLE_PADEL_TABLE_ID=tblnAtmjNbrHI02OT python3 /home/ubuntu/.hermes/scripts/upsert_padel_jobs_airtable.py /tmp/padel_jobs_found.json\n- The helper script is schema-aware, deduplicates against existing Airtable rows, and only writes `Added to table at` when a row is first created.\n- The helper now also treats normalized role-family + club + location overlap as an update signal when URLs/titles differ across languages or boards.\n\nRequired record schema for each accepted result:\n- Job Key: use a stable deterministic key. Prefer exactly `url:<normalized canonical URL>` when a canonical URL exists; otherwise use `url:<normalized job URL>`; only fall back to a normalized semantic key when no usable URL exists.\n- Job Title\n- Club Name\n- Role Type: use a normalized role-family label such as padel coach, head padel coach, senior padel coach, padel instructor, or director of padel\n- Location\n- Country\n- Source Site\n- Source Type\n- Job URL\n- Canonical URL\n- Search Query\n- Posted Text\n- Posted Date Raw\n- Added to table at: set this to the current run timestamp for accepted results; the helper will preserve the existing value on updates and keep it only as the original add date\n- Summary (1-3 concise sentences)\n- Email: the direct email for the hiring club/organization only; otherwise blank\n- Phone Number: the direct phone number for the hiring club/organization only; otherwise blank\n- Instagram: the official Instagram profile URL/handle for the hiring club/organization only; otherwise blank\n- Facebook: the official Facebook profile URL/handle for the hiring club/organization only; otherwise blank\n- Other: semicolon-separated official non-Instagram/non-Facebook social links/handles for the hiring club/organization only; otherwise blank\n\nColumn notes for this Airtable table:\n- Do not include or write: Padel Explicit, Confidence, Status, Exclusion Reason, Raw Snippet, First Seen At, or Last Seen At.\n- The table has EMAIL SENT? for later outreach tracking. Do not set EMAIL SENT? true during discovery/upsert; leave it unset/false.\n- Column order in Airtable may change; rely on field names, not position.\n- The helper script handles the table's exact Job Key field name internally.\n\nData quality rules:\n- Only write ACCEPTED results to Airtable.\n- Do not write rejected/noisy results to Airtable.\n- Make Job Key stable across reruns so upserts work.\n- Deduplicate within the run before writing.\n- Save the accepted results as a JSON array to /tmp/padel_jobs_found.json, then run the helper script to upsert them.\n- If there are zero accepted results, write [] to /tmp/padel_jobs_found.json and still run the helper script.\n- After running the helper script, read its JSON output and use it as the truth for whether rows were newly created vs merely updated.\n- Only describe/list jobs as NEW in the Telegram report if they correspond to newly created Airtable rows.\n- If the helper reports created=0 and updated>0, say there were no new jobs today and that existing rows were refreshed.\n\nFailure handling:\n- If web_search or web_extract fails because Firecrawl credits/token/config are not working, send a short alert saying the run could not complete because the Firecrawl-backed web tools failed, and do NOT claim the market had no jobs.\n- If only some pages fail, continue with the remaining sources and mention the partial coverage briefly.\n\nFinal Telegram output format:\n1. Start with: \"Global padel coach jobs daily\"\n2. Then one short status line:\n   - either number of NEW jobs added\n   - or no new high-confidence jobs found today\n   - or Firecrawl/web-tools failure\n3. Then a bullet list of NEWLY ADDED jobs only, with:\n   - title\n   - club/employer\n   - location\n   - why it is relevant\n   - source\n   - link\n4. Then a short coverage line listing which source families were checked.\n5. Then a short Airtable line confirming how many rows were created vs updated in the Global Padel Coach Jobs table.\n\nBe concise, high-signal, and evidence-based.",
+      "skills": [
+        "job-monitoring-with-airtable"
+      ],
+      "skill": "job-monitoring-with-airtable",
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 * * *",
+        "display": "0 8 * * *"
+      },
+      "schedule_display": "0 8 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 26
+      },
+      "enabled": false,
+      "state": "paused",
+      "paused_at": "2026-06-26T23:58:57.120881+02:00",
+      "paused_reason": null,
+      "created_at": "2026-06-03T14:05:21.471032+02:00",
+      "next_run_at": "2026-06-27T08:00:00+02:00",
+      "last_run_at": "2026-06-26T08:15:36.797575+02:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "8667992401",
+        "chat_name": "Fausto Genga",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "web",
+        "browser",
+        "terminal",
+        "file",
+        "skills"
+      ],
+      "workdir": null,
+      "profile": null
+    },
+    {
+      "id": "91cdbbf5d133",
+      "name": "global-padel-coach-jobs-spanish-daily",
+      "prompt": "You are running a daily global Spanish-language job hunt for padel coaching roles.\n\nMission:\nFind NEW or still-active job offers from around the world for padel clubs, academies, resorts, federations, and sports centers that are hiring for padel coaching roles, using Spanish-language search strategies.\n\nCritical duplicate rule:\n- Airtable is the source of truth for what is already in the list.\n- Do not treat an already-listed job as new just because you found it again on a later run.\n- Only count a job as NEW if it is not already present in Airtable.\n- Existing jobs can be refreshed/updated, but they should not be counted as newly added jobs.\n- This cron writes to the SAME Airtable table as the English cron, so overlap must upsert, not duplicate.\n- Before calling a result NEW, compare it against Airtable by canonical URL, job URL, and normalized role-family + club/employer + location.\n- If a Spanish-language listing appears to be the same underlying opening as an English row already in Airtable, treat it as an update even when the wording, accents, board URL, or source site differ.\n- Only keep two same-employer same-location coaching rows if the sources show a clear differentiator such as a different stable posting URL, a different specialty/level, a different requisition, or explicit evidence they are separate openings.\n\nTarget roles:\n- monitor de padel\n- monitor de p\u00e1del\n- profesor de padel\n- profesor de p\u00e1del\n- entrenador de padel\n- entrenador de p\u00e1del\n- instructor de padel\n- instructor de p\u00e1del\n- coach de padel\n- coach de p\u00e1del\n- director de padel\n- director de p\u00e1del\n- academia de padel coach\n- academia de p\u00e1del coach\n\nImportant exclusions:\n- NEVER include results from thenet-padel.com\n- reject tennis-only roles unless the page explicitly shows padel is part of the job\n- reject pickleball-only roles\n- reject generic fitness/sports jobs with no real evidence of padel\n- reject aggregator spam pages with no readable underlying job details\n- reject pages that mention padel only incidentally without a real hiring signal\n\nSource strategy:\nSearch broadly across Spanish-language job sites, ATS pages, search-engine-discovered pages, and direct club/federation/resort websites.\nPrioritize sources such as:\n- LinkedIn Jobs\n- Indeed\n- Jooble\n- Talent.com\n- Computrabajo\n- Magneto\n- InfoJobs\n- Job boards or employer sites in Spanish discovered via search\n- Google-discovered career pages\n- Greenhouse\n- Lever\n- Workable\n- Teamtailor\n- SmartRecruiters\n- Ashby\n- Recruitee\n- direct padel club, academy, federation, resort, and racket-club websites\n\nSearch globally, not just one country. Vary the searches by role, phrasing, and geography.\nPrefer Spanish-language query families such as:\n- \"monitor de padel\" empleo\n- \"monitor de p\u00e1del\" trabajo\n- \"profesor de padel\" vacante\n- \"profesor de p\u00e1del\" oferta laboral\n- \"entrenador de padel\" se busca\n- \"entrenador de p\u00e1del\" contratando\n- \"instructor de padel\" club de padel\n- \"director de p\u00e1del\" academia\n- combine title queries with country/city names when useful\nSearch both accented and unaccented variants because many sites omit accents.\n\nExecution rules:\n1. Use web_search first for broad discovery.\n2. Use web_extract to read candidate pages when possible.\n3. Use browser tools as fallback for pages that need interaction or better rendering.\n4. Prefer grounded, readable source pages over thin aggregator snippets.\n5. For each accepted result, confirm there is explicit or strong evidence that the role is truly about padel.\n6. Collect up to 15 high-confidence jobs per run.\n7. If the same job appears on multiple sites, keep the best original/most informative URL.\n8. Treat the run as successful even if you find zero jobs; do not invent matches.\n\nContact enrichment rules:\n- For each accepted result, try to enrich the row with the hiring club/organization's direct contact details when they are publicly visible and grounded.\n- Fill these fields when available:\n  - Email\n  - Phone Number\n  - Instagram\n  - Facebook\n  - Other\n- Only use contact details that clearly belong to the actual club/organization trying to hire the padel coach.\n- Do NOT copy contact details from agencies, recruiters, generic job boards, listing mirrors, or intermediaries unless the page clearly shows they are the actual hiring organization.\n- If the listing is posted by an agency/intermediary and the real club/organization is not identified or its own contact details are not exposed, leave Email, Phone Number, Instagram, Facebook, and Other blank.\n- Prefer official club/org sources for contact enrichment: the employer's own website, contact page, footer, about page, official Instagram/Facebook pages, or other clearly official profiles.\n- Instagram should contain only the official Instagram profile URL/handle for the hiring club/org when grounded. Facebook should contain only the official Facebook profile URL/handle when grounded. Other should contain a concise semicolon-separated list of other official profiles such as LinkedIn, TikTok, YouTube, or X when grounded.\n- If a phone number or email appears only for the recruiter/agency and not the club/org, leave the field blank.\n- Do not guess or infer contact details.\n\nAirtable destination:\n- Write to base ID appFiBKeB4uE6os5e.\n- Write to table ID tblnAtmjNbrHI02OT (Global Padel Coach Jobs).\n- Use the helper script already present on disk:\n  AIRTABLE_PADEL_BASE_ID=appFiBKeB4uE6os5e AIRTABLE_PADEL_TABLE_ID=tblnAtmjNbrHI02OT python3 /home/ubuntu/.hermes/scripts/upsert_padel_jobs_airtable.py /tmp/padel_jobs_found.json\n- The helper script is schema-aware, deduplicates against existing Airtable rows, and only writes `Added to table at` when a row is first created.\n- The helper now also treats normalized role-family + club + location overlap as an update signal when URLs/titles differ across languages or boards.\n\nRequired record schema for each accepted result:\n- Job Key: use a stable deterministic key. Prefer exactly `url:<normalized canonical URL>` when a canonical URL exists; otherwise use `url:<normalized job URL>`; only fall back to a normalized semantic key when no usable URL exists.\n- Job Title\n- Club Name\n- Role Type: use a normalized role-family label such as padel coach, head padel coach, senior padel coach, padel instructor, or director of padel\n- Location\n- Country\n- Source Site\n- Source Type\n- Job URL\n- Canonical URL\n- Search Query\n- Posted Text\n- Posted Date Raw\n- Added to table at: set this to the current run timestamp for accepted results; the helper will preserve the existing value on updates and keep it only as the original add date\n- Summary (1-3 concise sentences)\n- Email: the direct email for the hiring club/organization only; otherwise blank\n- Phone Number: the direct phone number for the hiring club/organization only; otherwise blank\n- Instagram: the official Instagram profile URL/handle for the hiring club/organization only; otherwise blank\n- Facebook: the official Facebook profile URL/handle for the hiring club/organization only; otherwise blank\n- Other: semicolon-separated official non-Instagram/non-Facebook social links/handles for the hiring club/organization only; otherwise blank\n\nColumn notes for this Airtable table:\n- Do not include or write: Padel Explicit, Confidence, Status, Exclusion Reason, Raw Snippet, First Seen At, or Last Seen At.\n- The table has EMAIL SENT? for later outreach tracking. Do not set EMAIL SENT? true during discovery/upsert; leave it unset/false.\n- Column order in Airtable may change; rely on field names, not position.\n- The helper script handles the table's exact Job Key field name internally.\n\nData quality rules:\n- Only write ACCEPTED results to Airtable.\n- Do not write rejected/noisy results to Airtable.\n- Make Job Key stable across reruns so upserts work.\n- Deduplicate within the run before writing.\n- Save the accepted results as a JSON array to /tmp/padel_jobs_found.json, then run the helper script to upsert them.\n- If there are zero accepted results, write [] to /tmp/padel_jobs_found.json and still run the helper script.\n- After running the helper script, read its JSON output and use it as the truth for whether rows were newly created vs merely updated.\n- Only describe/list jobs as NEW in the Telegram report if they correspond to newly created Airtable rows.\n- If the helper reports created=0 and updated>0, say there were no new jobs today and that existing rows were refreshed.\n\nFailure handling:\n- If web_search or web_extract fails because Firecrawl credits/token/config are not working, send a short alert saying the run could not complete because the Firecrawl-backed web tools failed, and do NOT claim the market had no jobs.\n- If only some pages fail, continue with the remaining sources and mention the partial coverage briefly.\n\nFinal Telegram output format:\n1. Start with: \"Global padel coach jobs daily (Spanish)\"\n2. Then one short status line:\n   - either number of NEW jobs added\n   - or no new high-confidence jobs found today\n   - or Firecrawl/web-tools failure\n3. Then a bullet list of NEWLY ADDED jobs only, with:\n   - title\n   - club/employer\n   - location\n   - why it is relevant\n   - source\n   - link\n4. Then a short coverage line listing which source families were checked.\n5. Then a short Airtable line confirming how many rows were created vs updated in the Global Padel Coach Jobs table.\n\nBe concise, high-signal, and evidence-based.",
+      "skills": [
+        "job-monitoring-with-airtable"
+      ],
+      "skill": "job-monitoring-with-airtable",
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 8 * * *",
+        "display": "30 8 * * *"
+      },
+      "schedule_display": "30 8 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 23
+      },
+      "enabled": false,
+      "state": "paused",
+      "paused_at": "2026-06-26T23:58:58.129164+02:00",
+      "paused_reason": null,
+      "created_at": "2026-06-08T14:35:44.419546+02:00",
+      "next_run_at": "2026-06-27T08:30:00+02:00",
+      "last_run_at": "2026-06-26T08:38:57.726222+02:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "8667992401",
+        "chat_name": "Fausto Genga",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "web",
+        "browser",
+        "terminal",
+        "file",
+        "skills"
+      ],
+      "workdir": null,
+      "profile": null
+    },
+    {
+      "id": "3245c1ec26f0",
+      "name": "padel-jobs-spanish-argentina",
+      "prompt": "You are running a daily regional Spanish-language job hunt for padel coaching roles.\n\nMission:\nFind NEW or still-active job offers for padel clubs, academies, resorts, federations, and sports centers hiring for padel coaching roles in Argentina only.\n\nRegion scope:\n- Argentina only.\n- Focus especially on Buenos Aires, C\u00f3rdoba, Rosario, Mendoza, Mar del Plata, and other strong Argentinian padel markets.\n- Exclude Spain and all other Spanish-speaking countries.\n\nCritical duplicate rule:\n- Airtable is the source of truth.\n- This cron writes to the SAME Airtable table as the other regional padel crons, so overlap must upsert, not duplicate.\n- Only count a job as NEW if it is not already present in Airtable.\n- Existing jobs can be refreshed/updated, but they should not be counted as newly added jobs.\n- Before calling a result NEW, compare it against Airtable by canonical URL, job URL, and normalized role-family + club/employer + location.\n- If a Spanish/English wording difference or different board URL appears to describe the same opening, treat it as an update.\n\nTarget roles:\n- monitor de padel\n- monitor de p\u00e1del\n- profesor de padel\n- profesor de p\u00e1del\n- entrenador de padel\n- entrenador de p\u00e1del\n- instructor de padel\n- instructor de p\u00e1del\n- coach de padel\n- coach de p\u00e1del\n- director de padel\n- director de p\u00e1del\n\nImportant exclusions:\n- NEVER include results from thenet-padel.com\n- reject tennis-only roles unless the page explicitly shows padel is part of the job\n- reject pickleball-only roles\n- reject generic fitness/sports jobs with no real evidence of padel\n- reject aggregator spam pages with no readable underlying job details\n- reject pages that mention padel only incidentally without a real hiring signal\n- reject jobs outside Argentina\n\nSource strategy:\nSearch broadly across Spanish-language job sites, ATS pages, search-engine-discovered pages, and direct club/federation/resort websites.\nPrioritize LinkedIn Jobs, Indeed, Jooble, Talent.com, Computrabajo, Magneto, InfoJobs, Google-discovered career pages, and direct club/academy/federation/resort sites.\nUse Spanish-language query families such as:\n- \"monitor de padel\" empleo Argentina\n- \"monitor de p\u00e1del\" trabajo Buenos Aires\n- \"profesor de padel\" vacante C\u00f3rdoba\n- \"entrenador de p\u00e1del\" contratando Rosario\nSearch both accented and unaccented variants.\n\nExecution rules:\n1. Use web_search first for broad discovery.\n2. Use web_extract to read candidate pages when possible.\n3. Use browser tools as fallback for pages that need interaction or better rendering.\n4. Prefer grounded, readable source pages over thin aggregator snippets.\n5. Confirm explicit or strong evidence that the role is truly about padel.\n6. Collect up to 15 high-confidence jobs per run.\n7. If the same job appears on multiple sites, keep the best original/most informative URL.\n8. Treat the run as successful even if you find zero jobs; do not invent matches.\n\nContact enrichment rules:\n- Enrich accepted rows only with direct employer/club contact details when publicly visible and grounded.\n- Fill Email, Phone Number, Instagram, Facebook, and Other only when they clearly belong to the hiring club/organization.\n- Do not copy recruiter/agency/intermediary contact details.\n- If ownership is unclear, leave the fields blank.\n\nAirtable destination:\n- Write to base ID appFiBKeB4uE6os5e.\n- Write to table ID tblnAtmjNbrHI02OT (Global Padel Coach Jobs).\n- Use: AIRTABLE_PADEL_BASE_ID=appFiBKeB4uE6os5e AIRTABLE_PADEL_TABLE_ID=tblnAtmjNbrHI02OT python3 /home/ubuntu/.hermes/scripts/upsert_padel_jobs_airtable.py /tmp/padel_jobs_found.json\n- The helper is schema-aware and also treats normalized role-family + club + location overlap as an update signal.\n\nRequired record schema for accepted results:\n- Job Key\n- Job Title\n- Club Name\n- Role Type\n- Location\n- Country\n- Source Site\n- Source Type\n- Job URL\n- Canonical URL\n- Search Query\n- Posted Text\n- Posted Date Raw\n- Added to table at\n- Summary\n- Email\n- Phone Number\n- Instagram\n- Facebook\n- Other\n\nColumn notes:\n- Do not write: Padel Explicit, Confidence, Status, Exclusion Reason, Raw Snippet, First Seen At, or Last Seen At.\n- Do not set EMAIL SENT? true.\n\nData quality rules:\n- Only write ACCEPTED results to Airtable.\n- Deduplicate within the run before writing.\n- Save accepted results as JSON to /tmp/padel_jobs_found.json, write [] if none, and still run the helper.\n- Use the helper output as truth for created vs updated rows.\n- Only list jobs as NEW in Telegram if they correspond to newly created Airtable rows.\n\nFailure handling:\n- If Firecrawl-backed web tools fail, send a short alert and do NOT claim the market had no jobs.\n- If only some pages fail, continue and mention partial coverage briefly.\n\nFinal Telegram output format:\n1. Start with: \"Padel jobs (Spanish / Argentina)\"\n2. One short status line\n3. Bullets for NEWLY ADDED jobs only\n4. One short coverage line\n5. One short Airtable created vs updated line\n\nBe concise, high-signal, and evidence-based.",
+      "skills": [
+        "job-monitoring-with-airtable"
+      ],
+      "skill": "job-monitoring-with-airtable",
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 4 * * *",
+        "display": "0 4 * * *"
+      },
+      "schedule_display": "0 4 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 3
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-26T21:50:09.478442+02:00",
+      "next_run_at": "2026-06-30T04:00:00+02:00",
+      "last_run_at": "2026-06-29T04:06:26.553658+02:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "8667992401",
+        "chat_name": "Fausto Genga",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "web",
+        "browser",
+        "terminal",
+        "file",
+        "skills"
+      ],
+      "workdir": null
+    },
+    {
+      "id": "8bdf8990a3b6",
+      "name": "padel-jobs-spanish-spain",
+      "prompt": "You are running a daily regional Spanish-language job hunt for padel coaching roles.\n\nMission:\nFind NEW or still-active job offers for padel clubs, academies, resorts, federations, and sports centers hiring for padel coaching roles in Spain only.\n\nRegion scope:\n- Spain only.\n- Focus especially on Madrid, Barcelona, Valencia, M\u00e1laga, Sevilla, Marbella, Alicante, and other strong Spanish padel markets.\n- Exclude Argentina and all other Spanish-speaking countries outside Spain.\n\nCritical duplicate rule:\n- Airtable is the source of truth.\n- This cron writes to the SAME Airtable table as the other regional padel crons, so overlap must upsert, not duplicate.\n- Only count a job as NEW if it is not already present in Airtable.\n- Existing jobs can be refreshed/updated, but they should not be counted as newly added jobs.\n- Before calling a result NEW, compare it against Airtable by canonical URL, job URL, and normalized role-family + club/employer + location.\n- If a Spanish/English wording difference or different board URL appears to describe the same opening, treat it as an update.\n\nTarget roles:\n- monitor de padel\n- monitor de p\u00e1del\n- profesor de padel\n- profesor de p\u00e1del\n- entrenador de padel\n- entrenador de p\u00e1del\n- instructor de padel\n- instructor de p\u00e1del\n- coach de padel\n- coach de p\u00e1del\n- director de padel\n- director de p\u00e1del\n\nImportant exclusions:\n- NEVER include results from thenet-padel.com\n- reject tennis-only roles unless the page explicitly shows padel is part of the job\n- reject pickleball-only roles\n- reject generic fitness/sports jobs with no real evidence of padel\n- reject aggregator spam pages with no readable underlying job details\n- reject pages that mention padel only incidentally without a real hiring signal\n- reject jobs outside Spain\n\nSource strategy:\nSearch broadly across Spanish-language job sites, ATS pages, search-engine-discovered pages, and direct club/federation/resort websites.\nPrioritize LinkedIn Jobs, Indeed, Jooble, Talent.com, Computrabajo, InfoJobs, Google-discovered career pages, and direct club/academy/federation/resort sites.\nUse Spanish-language query families such as:\n- \"monitor de padel\" empleo Espa\u00f1a\n- \"monitor de p\u00e1del\" trabajo Madrid\n- \"profesor de padel\" vacante Barcelona\n- \"entrenador de p\u00e1del\" contratando Valencia\n- \"director de p\u00e1del\" academia Marbella\nSearch both accented and unaccented variants.\n\nExecution rules:\n1. Use web_search first for broad discovery.\n2. Use web_extract to read candidate pages when possible.\n3. Use browser tools as fallback for pages that need interaction or better rendering.\n4. Prefer grounded, readable source pages over thin aggregator snippets.\n5. Confirm explicit or strong evidence that the role is truly about padel.\n6. Collect up to 15 high-confidence jobs per run.\n7. If the same job appears on multiple sites, keep the best original/most informative URL.\n8. Treat the run as successful even if you find zero jobs; do not invent matches.\n\nContact enrichment rules:\n- Enrich accepted rows only with direct employer/club contact details when publicly visible and grounded.\n- Fill Email, Phone Number, Instagram, Facebook, and Other only when they clearly belong to the hiring club/organization.\n- Do not copy recruiter/agency/intermediary contact details.\n- If ownership is unclear, leave the fields blank.\n\nAirtable destination:\n- Write to base ID appFiBKeB4uE6os5e.\n- Write to table ID tblnAtmjNbrHI02OT (Global Padel Coach Jobs).\n- Use: AIRTABLE_PADEL_BASE_ID=appFiBKeB4uE6os5e AIRTABLE_PADEL_TABLE_ID=tblnAtmjNbrHI02OT python3 /home/ubuntu/.hermes/scripts/upsert_padel_jobs_airtable.py /tmp/padel_jobs_found.json\n- The helper is schema-aware and also treats normalized role-family + club + location overlap as an update signal.\n\nRequired record schema for accepted results:\n- Job Key\n- Job Title\n- Club Name\n- Role Type\n- Location\n- Country\n- Source Site\n- Source Type\n- Job URL\n- Canonical URL\n- Search Query\n- Posted Text\n- Posted Date Raw\n- Added to table at\n- Summary\n- Email\n- Phone Number\n- Instagram\n- Facebook\n- Other\n\nColumn notes:\n- Do not write: Padel Explicit, Confidence, Status, Exclusion Reason, Raw Snippet, First Seen At, or Last Seen At.\n- Do not set EMAIL SENT? true.\n\nData quality rules:\n- Only write ACCEPTED results to Airtable.\n- Deduplicate within the run before writing.\n- Save accepted results as JSON to /tmp/padel_jobs_found.json, write [] if none, and still run the helper.\n- Use the helper output as truth for created vs updated rows.\n- Only list jobs as NEW in Telegram if they correspond to newly created Airtable rows.\n\nFailure handling:\n- If Firecrawl-backed web tools fail, send a short alert and do NOT claim the market had no jobs.\n- If only some pages fail, continue and mention partial coverage briefly.\n\nFinal Telegram output format:\n1. Start with: \"Padel jobs (Spanish / Spain)\"\n2. One short status line\n3. Bullets for NEWLY ADDED jobs only\n4. One short coverage line\n5. One short Airtable created vs updated line\n\nBe concise, high-signal, and evidence-based.",
+      "skills": [
+        "job-monitoring-with-airtable"
+      ],
+      "skill": "job-monitoring-with-airtable",
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 5 * * *",
+        "display": "0 5 * * *"
+      },
+      "schedule_display": "0 5 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 4
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-26T21:50:10.486189+02:00",
+      "next_run_at": "2026-06-30T05:00:00+02:00",
+      "last_run_at": "2026-06-29T05:05:12.135071+02:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "8667992401",
+        "chat_name": "Fausto Genga",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "web",
+        "browser",
+        "terminal",
+        "file",
+        "skills"
+      ],
+      "workdir": null
+    },
+    {
+      "id": "fdd2f7cab1a6",
+      "name": "padel-jobs-spanish-other",
+      "prompt": "You are running a daily regional Spanish-language job hunt for padel coaching roles.\n\nMission:\nFind NEW or still-active job offers for padel clubs, academies, resorts, federations, and sports centers hiring for padel coaching roles across Spanish-speaking countries other than Argentina and Spain.\n\nRegion scope:\n- Spanish-speaking countries other than Argentina and Spain.\n- Prioritize Mexico, Colombia, Chile, Peru, Uruguay, Paraguay, Ecuador, Costa Rica, Panama, Guatemala, Dominican Republic, and similar markets when real padel hiring appears.\n- Explicitly exclude Argentina and Spain.\n\nCritical duplicate rule:\n- Airtable is the source of truth.\n- This cron writes to the SAME Airtable table as the other regional padel crons, so overlap must upsert, not duplicate.\n- Only count a job as NEW if it is not already present in Airtable.\n- Existing jobs can be refreshed/updated, but they should not be counted as newly added jobs.\n- Before calling a result NEW, compare it against Airtable by canonical URL, job URL, and normalized role-family + club/employer + location.\n- If a Spanish/English wording difference or different board URL appears to describe the same opening, treat it as an update.\n\nTarget roles:\n- monitor de padel\n- monitor de p\u00e1del\n- profesor de padel\n- profesor de p\u00e1del\n- entrenador de padel\n- entrenador de p\u00e1del\n- instructor de padel\n- instructor de p\u00e1del\n- coach de padel\n- coach de p\u00e1del\n- director de padel\n- director de p\u00e1del\n\nImportant exclusions:\n- NEVER include results from thenet-padel.com\n- reject tennis-only roles unless the page explicitly shows padel is part of the job\n- reject pickleball-only roles\n- reject generic fitness/sports jobs with no real evidence of padel\n- reject aggregator spam pages with no readable underlying job details\n- reject pages that mention padel only incidentally without a real hiring signal\n- reject jobs outside this region scope\n\nSource strategy:\nSearch broadly across Spanish-language job sites, ATS pages, search-engine-discovered pages, and direct club/federation/resort websites.\nPrioritize LinkedIn Jobs, Indeed, Jooble, Talent.com, Computrabajo, Magneto, local Spanish-language boards, Google-discovered career pages, and direct club/academy/federation/resort sites.\nUse Spanish-language query families such as:\n- \"monitor de padel\" empleo M\u00e9xico\n- \"profesor de p\u00e1del\" vacante Colombia\n- \"entrenador de padel\" trabajo Chile\n- \"instructor de p\u00e1del\" contratando Per\u00fa\nSearch both accented and unaccented variants.\n\nExecution rules:\n1. Use web_search first for broad discovery.\n2. Use web_extract to read candidate pages when possible.\n3. Use browser tools as fallback for pages that need interaction or better rendering.\n4. Prefer grounded, readable source pages over thin aggregator snippets.\n5. Confirm explicit or strong evidence that the role is truly about padel.\n6. Collect up to 15 high-confidence jobs per run.\n7. If the same job appears on multiple sites, keep the best original/most informative URL.\n8. Treat the run as successful even if you find zero jobs; do not invent matches.\n\nContact enrichment rules:\n- Enrich accepted rows only with direct employer/club contact details when publicly visible and grounded.\n- Fill Email, Phone Number, Instagram, Facebook, and Other only when they clearly belong to the hiring club/organization.\n- Do not copy recruiter/agency/intermediary contact details.\n- If ownership is unclear, leave the fields blank.\n\nAirtable destination:\n- Write to base ID appFiBKeB4uE6os5e.\n- Write to table ID tblnAtmjNbrHI02OT (Global Padel Coach Jobs).\n- Use: AIRTABLE_PADEL_BASE_ID=appFiBKeB4uE6os5e AIRTABLE_PADEL_TABLE_ID=tblnAtmjNbrHI02OT python3 /home/ubuntu/.hermes/scripts/upsert_padel_jobs_airtable.py /tmp/padel_jobs_found.json\n- The helper is schema-aware and also treats normalized role-family + club + location overlap as an update signal.\n\nRequired record schema for accepted results:\n- Job Key\n- Job Title\n- Club Name\n- Role Type\n- Location\n- Country\n- Source Site\n- Source Type\n- Job URL\n- Canonical URL\n- Search Query\n- Posted Text\n- Posted Date Raw\n- Added to table at\n- Summary\n- Email\n- Phone Number\n- Instagram\n- Facebook\n- Other\n\nColumn notes:\n- Do not write: Padel Explicit, Confidence, Status, Exclusion Reason, Raw Snippet, First Seen At, or Last Seen At.\n- Do not set EMAIL SENT? true.\n\nData quality rules:\n- Only write ACCEPTED results to Airtable.\n- Deduplicate within the run before writing.\n- Save accepted results as JSON to /tmp/padel_jobs_found.json, write [] if none, and still run the helper.\n- Use the helper output as truth for created vs updated rows.\n- Only list jobs as NEW in Telegram if they correspond to newly created Airtable rows.\n\nFailure handling:\n- If Firecrawl-backed web tools fail, send a short alert and do NOT claim the market had no jobs.\n- If only some pages fail, continue and mention partial coverage briefly.\n\nFinal Telegram output format:\n1. Start with: \"Padel jobs (Spanish / Other countries)\"\n2. One short status line\n3. Bullets for NEWLY ADDED jobs only\n4. One short coverage line\n5. One short Airtable created vs updated line\n\nBe concise, high-signal, and evidence-based.",
+      "skills": [
+        "job-monitoring-with-airtable"
+      ],
+      "skill": "job-monitoring-with-airtable",
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 6 * * *",
+        "display": "0 6 * * *"
+      },
+      "schedule_display": "0 6 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 3
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-26T21:50:11.494336+02:00",
+      "next_run_at": "2026-06-30T06:00:00+02:00",
+      "last_run_at": "2026-06-29T06:04:40.248323+02:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "8667992401",
+        "chat_name": "Fausto Genga",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "web",
+        "browser",
+        "terminal",
+        "file",
+        "skills"
+      ],
+      "workdir": null
+    },
+    {
+      "id": "357f7bcd43b7",
+      "name": "padel-jobs-english-us",
+      "prompt": "You are running a daily regional English-language job hunt for padel coaching roles.\n\nMission:\nFind NEW or still-active job offers for padel clubs, academies, resorts, federations, and sports centers hiring for padel coaching roles in the United States only.\n\nRegion scope:\n- United States only.\n- Focus especially on Florida, Texas, California, New York, and other growing US padel markets.\n- Exclude Europe, Asia, Canada, Australia, and the rest-of-world bucket.\n\nCritical duplicate rule:\n- Airtable is the source of truth.\n- This cron writes to the SAME Airtable table as the other regional padel crons, so overlap must upsert, not duplicate.\n- Only count a job as NEW if it is not already present in Airtable.\n- Existing jobs can be refreshed/updated, but they should not be counted as newly added jobs.\n- Before calling a result NEW, compare it against Airtable by canonical URL, job URL, and normalized role-family + club/employer + location.\n- If a translated title, alternate board URL, or English/Spanish phrasing appears to describe the same opening, treat it as an update.\n\nTarget roles:\n- padel coach\n- head padel coach\n- padel head coach\n- senior padel coach\n- assistant padel coach\n- padel instructor\n- director of padel\n- padel academy coach\n\nImportant exclusions:\n- NEVER include results from thenet-padel.com\n- reject tennis-only roles unless the page explicitly shows padel is part of the job\n- reject pickleball-only roles\n- reject generic fitness/sports jobs with no real evidence of padel\n- reject aggregator spam pages with no readable underlying job details\n- reject jobs outside the United States\n\nSource strategy:\nSearch broadly across major job sites, ATS pages, search-engine-discovered pages, and direct club/federation/resort websites.\nPrioritize LinkedIn Jobs, Indeed, Glassdoor, Jooble, Talent.com, Google-discovered career pages, Greenhouse, Lever, Workable, Teamtailor, SmartRecruiters, Ashby, Recruitee, and direct club/academy/federation/resort sites.\nUse region-aware query families such as:\n- \"padel coach\" jobs USA\n- \"padel instructor\" Florida\n- \"head padel coach\" Texas\n- \"director of padel\" California\n\nExecution rules:\n1. Use web_search first for broad discovery.\n2. Use web_extract to read candidate pages when possible.\n3. Use browser tools as fallback for pages that need interaction or better rendering.\n4. Prefer grounded, readable source pages over thin aggregator snippets.\n5. Confirm explicit or strong evidence that the role is truly about padel.\n6. Collect up to 15 high-confidence jobs per run.\n7. If the same job appears on multiple sites, keep the best original/most informative URL.\n8. Treat the run as successful even if you find zero jobs; do not invent matches.\n\nContact enrichment rules:\n- Enrich accepted rows only with direct employer/club contact details when publicly visible and grounded.\n- Fill Email, Phone Number, Instagram, Facebook, and Other only when they clearly belong to the hiring club/organization.\n- Do not copy recruiter/agency/intermediary contact details.\n- If ownership is unclear, leave the fields blank.\n\nAirtable destination:\n- Write to base ID appFiBKeB4uE6os5e.\n- Write to table ID tblnAtmjNbrHI02OT (Global Padel Coach Jobs).\n- Use: AIRTABLE_PADEL_BASE_ID=appFiBKeB4uE6os5e AIRTABLE_PADEL_TABLE_ID=tblnAtmjNbrHI02OT python3 /home/ubuntu/.hermes/scripts/upsert_padel_jobs_airtable.py /tmp/padel_jobs_found.json\n- The helper is schema-aware and also treats normalized role-family + club + location overlap as an update signal.\n\nRequired record schema for accepted results:\n- Job Key\n- Job Title\n- Club Name\n- Role Type\n- Location\n- Country\n- Source Site\n- Source Type\n- Job URL\n- Canonical URL\n- Search Query\n- Posted Text\n- Posted Date Raw\n- Added to table at\n- Summary\n- Email\n- Phone Number\n- Instagram\n- Facebook\n- Other\n\nColumn notes:\n- Do not write: Padel Explicit, Confidence, Status, Exclusion Reason, Raw Snippet, First Seen At, or Last Seen At.\n- Do not set EMAIL SENT? true.\n\nData quality rules:\n- Only write ACCEPTED results to Airtable.\n- Deduplicate within the run before writing.\n- Save accepted results as JSON to /tmp/padel_jobs_found.json, write [] if none, and still run the helper.\n- Use the helper output as truth for created vs updated rows.\n- Only list jobs as NEW in Telegram if they correspond to newly created Airtable rows.\n\nFailure handling:\n- If Firecrawl-backed web tools fail, send a short alert and do NOT claim the market had no jobs.\n- If only some pages fail, continue and mention partial coverage briefly.\n\nFinal Telegram output format:\n1. Start with: \"Padel jobs (English / United States)\"\n2. One short status line\n3. Bullets for NEWLY ADDED jobs only\n4. One short coverage line\n5. One short Airtable created vs updated line\n\nBe concise, high-signal, and evidence-based.",
+      "skills": [
+        "job-monitoring-with-airtable"
+      ],
+      "skill": "job-monitoring-with-airtable",
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 7 * * *",
+        "display": "0 7 * * *"
+      },
+      "schedule_display": "0 7 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 3
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-26T21:51:48.130423+02:00",
+      "next_run_at": "2026-06-30T07:00:00+02:00",
+      "last_run_at": "2026-06-29T07:07:44.936312+02:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "8667992401",
+        "chat_name": "Fausto Genga",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "web",
+        "browser",
+        "terminal",
+        "file",
+        "skills"
+      ],
+      "workdir": null
+    },
+    {
+      "id": "e447c7b7a62c",
+      "name": "padel-jobs-english-europe",
+      "prompt": "You are running a daily regional English-language job hunt for padel coaching roles.\n\nMission:\nFind NEW or still-active job offers for padel clubs, academies, resorts, federations, and sports centers hiring for padel coaching roles in Europe except Spain.\n\nRegion scope:\n- Europe except Spain.\n- Prioritize United Kingdom, France, Germany, Italy, Portugal, Netherlands, Belgium, Sweden, Denmark, Finland, Norway, Ireland, Switzerland, and Austria.\n- Explicitly exclude Spain, which is handled by the Spanish Spain cron.\n\nCritical duplicate rule:\n- Airtable is the source of truth.\n- This cron writes to the SAME Airtable table as the other regional padel crons, so overlap must upsert, not duplicate.\n- Only count a job as NEW if it is not already present in Airtable.\n- Existing jobs can be refreshed/updated, but they should not be counted as newly added jobs.\n- Before calling a result NEW, compare it against Airtable by canonical URL, job URL, and normalized role-family + club/employer + location.\n- If a translated title, alternate board URL, or English/Spanish phrasing appears to describe the same opening, treat it as an update.\n\nTarget roles:\n- padel coach\n- head padel coach\n- padel head coach\n- senior padel coach\n- assistant padel coach\n- padel instructor\n- director of padel\n- padel academy coach\n\nImportant exclusions:\n- NEVER include results from thenet-padel.com\n- reject tennis-only roles unless the page explicitly shows padel is part of the job\n- reject pickleball-only roles\n- reject generic fitness/sports jobs with no real evidence of padel\n- reject aggregator spam pages with no readable underlying job details\n- reject jobs outside this region scope\n- reject jobs in Spain\n\nSource strategy:\nSearch broadly across major job sites, ATS pages, search-engine-discovered pages, and direct club/federation/resort websites.\nPrioritize LinkedIn Jobs, Indeed, Glassdoor, Jooble, Talent.com, Google-discovered career pages, Greenhouse, Lever, Workable, Teamtailor, SmartRecruiters, Ashby, Recruitee, and direct club/academy/federation/resort sites.\nUse region-aware query families such as:\n- \"padel coach\" Europe\n- \"padel coach\" London\n- \"head padel coach\" France\n- \"padel instructor\" Portugal\n- \"director of padel\" Italy\n\nExecution rules:\n1. Use web_search first for broad discovery.\n2. Use web_extract to read candidate pages when possible.\n3. Use browser tools as fallback for pages that need interaction or better rendering.\n4. Prefer grounded, readable source pages over thin aggregator snippets.\n5. Confirm explicit or strong evidence that the role is truly about padel.\n6. Collect up to 15 high-confidence jobs per run.\n7. If the same job appears on multiple sites, keep the best original/most informative URL.\n8. Treat the run as successful even if you find zero jobs; do not invent matches.\n\nContact enrichment rules:\n- Enrich accepted rows only with direct employer/club contact details when publicly visible and grounded.\n- Fill Email, Phone Number, Instagram, Facebook, and Other only when they clearly belong to the hiring club/organization.\n- Do not copy recruiter/agency/intermediary contact details.\n- If ownership is unclear, leave the fields blank.\n\nAirtable destination:\n- Write to base ID appFiBKeB4uE6os5e.\n- Write to table ID tblnAtmjNbrHI02OT (Global Padel Coach Jobs).\n- Use: AIRTABLE_PADEL_BASE_ID=appFiBKeB4uE6os5e AIRTABLE_PADEL_TABLE_ID=tblnAtmjNbrHI02OT python3 /home/ubuntu/.hermes/scripts/upsert_padel_jobs_airtable.py /tmp/padel_jobs_found.json\n- The helper is schema-aware and also treats normalized role-family + club + location overlap as an update signal.\n\nRequired record schema for accepted results:\n- Job Key\n- Job Title\n- Club Name\n- Role Type\n- Location\n- Country\n- Source Site\n- Source Type\n- Job URL\n- Canonical URL\n- Search Query\n- Posted Text\n- Posted Date Raw\n- Added to table at\n- Summary\n- Email\n- Phone Number\n- Instagram\n- Facebook\n- Other\n\nColumn notes:\n- Do not write: Padel Explicit, Confidence, Status, Exclusion Reason, Raw Snippet, First Seen At, or Last Seen At.\n- Do not set EMAIL SENT? true.\n\nData quality rules:\n- Only write ACCEPTED results to Airtable.\n- Deduplicate within the run before writing.\n- Save accepted results as JSON to /tmp/padel_jobs_found.json, write [] if none, and still run the helper.\n- Use the helper output as truth for created vs updated rows.\n- Only list jobs as NEW in Telegram if they correspond to newly created Airtable rows.\n\nFailure handling:\n- If Firecrawl-backed web tools fail, send a short alert and do NOT claim the market had no jobs.\n- If only some pages fail, continue and mention partial coverage briefly.\n\nFinal Telegram output format:\n1. Start with: \"Padel jobs (English / Europe)\"\n2. One short status line\n3. Bullets for NEWLY ADDED jobs only\n4. One short coverage line\n5. One short Airtable created vs updated line\n\nBe concise, high-signal, and evidence-based.",
+      "skills": [
+        "job-monitoring-with-airtable"
+      ],
+      "skill": "job-monitoring-with-airtable",
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8 * * *",
+        "display": "0 8 * * *"
+      },
+      "schedule_display": "0 8 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 3
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-26T21:51:49.138063+02:00",
+      "next_run_at": "2026-06-30T08:00:00+02:00",
+      "last_run_at": "2026-06-29T08:05:39.879581+02:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "8667992401",
+        "chat_name": "Fausto Genga",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "web",
+        "browser",
+        "terminal",
+        "file",
+        "skills"
+      ],
+      "workdir": null
+    },
+    {
+      "id": "f3ac339c9b90",
+      "name": "padel-jobs-english-asia",
+      "prompt": "You are running a daily regional English-language job hunt for padel coaching roles.\n\nMission:\nFind NEW or still-active job offers for padel clubs, academies, resorts, federations, and sports centers hiring for padel coaching roles in Asia-focused English-language markets, including Gulf/Middle East markets where padel jobs commonly surface in English.\n\nRegion scope:\n- Asia-focused English-language markets, including UAE, Qatar, Saudi Arabia, Singapore, Hong Kong, Thailand, Indonesia, India, Philippines, Malaysia, and Japan.\n- Exclude Europe, the United States, and the rest-of-world bucket.\n\nCritical duplicate rule:\n- Airtable is the source of truth.\n- This cron writes to the SAME Airtable table as the other regional padel crons, so overlap must upsert, not duplicate.\n- Only count a job as NEW if it is not already present in Airtable.\n- Existing jobs can be refreshed/updated, but they should not be counted as newly added jobs.\n- Before calling a result NEW, compare it against Airtable by canonical URL, job URL, and normalized role-family + club/employer + location.\n- If a translated title, alternate board URL, or English/Spanish phrasing appears to describe the same opening, treat it as an update.\n\nTarget roles:\n- padel coach\n- head padel coach\n- padel head coach\n- senior padel coach\n- assistant padel coach\n- padel instructor\n- director of padel\n- padel academy coach\n\nImportant exclusions:\n- NEVER include results from thenet-padel.com\n- reject tennis-only roles unless the page explicitly shows padel is part of the job\n- reject pickleball-only roles\n- reject generic fitness/sports jobs with no real evidence of padel\n- reject aggregator spam pages with no readable underlying job details\n- reject jobs outside this region scope\n\nSource strategy:\nSearch broadly across major job sites, ATS pages, search-engine-discovered pages, and direct club/federation/resort websites.\nPrioritize LinkedIn Jobs, Indeed, Glassdoor, Jooble, Talent.com, Google-discovered career pages, Greenhouse, Lever, Workable, Teamtailor, SmartRecruiters, Ashby, Recruitee, and direct club/academy/federation/resort sites.\nUse region-aware query families such as:\n- \"padel coach\" Dubai\n- \"padel instructor\" UAE\n- \"head padel coach\" Qatar\n- \"director of padel\" Saudi Arabia\n- \"padel coach\" Singapore\n\nExecution rules:\n1. Use web_search first for broad discovery.\n2. Use web_extract to read candidate pages when possible.\n3. Use browser tools as fallback for pages that need interaction or better rendering.\n4. Prefer grounded, readable source pages over thin aggregator snippets.\n5. Confirm explicit or strong evidence that the role is truly about padel.\n6. Collect up to 15 high-confidence jobs per run.\n7. If the same job appears on multiple sites, keep the best original/most informative URL.\n8. Treat the run as successful even if you find zero jobs; do not invent matches.\n\nContact enrichment rules:\n- Enrich accepted rows only with direct employer/club contact details when publicly visible and grounded.\n- Fill Email, Phone Number, Instagram, Facebook, and Other only when they clearly belong to the hiring club/organization.\n- Do not copy recruiter/agency/intermediary contact details.\n- If ownership is unclear, leave the fields blank.\n\nAirtable destination:\n- Write to base ID appFiBKeB4uE6os5e.\n- Write to table ID tblnAtmjNbrHI02OT (Global Padel Coach Jobs).\n- Use: AIRTABLE_PADEL_BASE_ID=appFiBKeB4uE6os5e AIRTABLE_PADEL_TABLE_ID=tblnAtmjNbrHI02OT python3 /home/ubuntu/.hermes/scripts/upsert_padel_jobs_airtable.py /tmp/padel_jobs_found.json\n- The helper is schema-aware and also treats normalized role-family + club + location overlap as an update signal.\n\nRequired record schema for accepted results:\n- Job Key\n- Job Title\n- Club Name\n- Role Type\n- Location\n- Country\n- Source Site\n- Source Type\n- Job URL\n- Canonical URL\n- Search Query\n- Posted Text\n- Posted Date Raw\n- Added to table at\n- Summary\n- Email\n- Phone Number\n- Instagram\n- Facebook\n- Other\n\nColumn notes:\n- Do not write: Padel Explicit, Confidence, Status, Exclusion Reason, Raw Snippet, First Seen At, or Last Seen At.\n- Do not set EMAIL SENT? true.\n\nData quality rules:\n- Only write ACCEPTED results to Airtable.\n- Deduplicate within the run before writing.\n- Save accepted results as JSON to /tmp/padel_jobs_found.json, write [] if none, and still run the helper.\n- Use the helper output as truth for created vs updated rows.\n- Only list jobs as NEW in Telegram if they correspond to newly created Airtable rows.\n\nFailure handling:\n- If Firecrawl-backed web tools fail, send a short alert and do NOT claim the market had no jobs.\n- If only some pages fail, continue and mention partial coverage briefly.\n\nFinal Telegram output format:\n1. Start with: \"Padel jobs (English / Asia)\"\n2. One short status line\n3. Bullets for NEWLY ADDED jobs only\n4. One short coverage line\n5. One short Airtable created vs updated line\n\nBe concise, high-signal, and evidence-based.",
+      "skills": [
+        "job-monitoring-with-airtable"
+      ],
+      "skill": "job-monitoring-with-airtable",
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 * * *",
+        "display": "0 9 * * *"
+      },
+      "schedule_display": "0 9 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 3
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-26T21:51:50.146058+02:00",
+      "next_run_at": "2026-06-30T09:00:00+02:00",
+      "last_run_at": "2026-06-29T09:04:15.595782+02:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "8667992401",
+        "chat_name": "Fausto Genga",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "web",
+        "browser",
+        "terminal",
+        "file",
+        "skills"
+      ],
+      "workdir": null
+    },
+    {
+      "id": "7906e84ff7f9",
+      "name": "padel-jobs-english-rest",
+      "prompt": "You are running a daily regional English-language job hunt for padel coaching roles.\n\nMission:\nFind NEW or still-active job offers for padel clubs, academies, resorts, federations, and sports centers hiring for padel coaching roles across the English-language rest of world not covered by the United States, Europe, or Asia crons.\n\nRegion scope:\n- English-language rest of world not covered by the United States, Europe, or Asia crons.\n- Prioritize Canada, Australia, New Zealand, South Africa, Caribbean markets, and any remaining markets where English-language padel hiring appears.\n- Explicitly exclude the United States, Europe, and Asia buckets.\n\nCritical duplicate rule:\n- Airtable is the source of truth.\n- This cron writes to the SAME Airtable table as the other regional padel crons, so overlap must upsert, not duplicate.\n- Only count a job as NEW if it is not already present in Airtable.\n- Existing jobs can be refreshed/updated, but they should not be counted as newly added jobs.\n- Before calling a result NEW, compare it against Airtable by canonical URL, job URL, and normalized role-family + club/employer + location.\n- If a translated title, alternate board URL, or English/Spanish phrasing appears to describe the same opening, treat it as an update.\n\nTarget roles:\n- padel coach\n- head padel coach\n- padel head coach\n- senior padel coach\n- assistant padel coach\n- padel instructor\n- director of padel\n- padel academy coach\n\nImportant exclusions:\n- NEVER include results from thenet-padel.com\n- reject tennis-only roles unless the page explicitly shows padel is part of the job\n- reject pickleball-only roles\n- reject generic fitness/sports jobs with no real evidence of padel\n- reject aggregator spam pages with no readable underlying job details\n- reject jobs outside this region scope\n\nSource strategy:\nSearch broadly across major job sites, ATS pages, search-engine-discovered pages, and direct club/federation/resort websites.\nPrioritize LinkedIn Jobs, Indeed, Glassdoor, Jooble, Talent.com, Google-discovered career pages, Greenhouse, Lever, Workable, Teamtailor, SmartRecruiters, Ashby, Recruitee, and direct club/academy/federation/resort sites.\nUse region-aware query families such as:\n- \"padel coach\" Canada\n- \"padel instructor\" Australia\n- \"head padel coach\" New Zealand\n- \"director of padel\" South Africa\n\nExecution rules:\n1. Use web_search first for broad discovery.\n2. Use web_extract to read candidate pages when possible.\n3. Use browser tools as fallback for pages that need interaction or better rendering.\n4. Prefer grounded, readable source pages over thin aggregator snippets.\n5. Confirm explicit or strong evidence that the role is truly about padel.\n6. Collect up to 15 high-confidence jobs per run.\n7. If the same job appears on multiple sites, keep the best original/most informative URL.\n8. Treat the run as successful even if you find zero jobs; do not invent matches.\n\nContact enrichment rules:\n- Enrich accepted rows only with direct employer/club contact details when publicly visible and grounded.\n- Fill Email, Phone Number, Instagram, Facebook, and Other only when they clearly belong to the hiring club/organization.\n- Do not copy recruiter/agency/intermediary contact details.\n- If ownership is unclear, leave the fields blank.\n\nAirtable destination:\n- Write to base ID appFiBKeB4uE6os5e.\n- Write to table ID tblnAtmjNbrHI02OT (Global Padel Coach Jobs).\n- Use: AIRTABLE_PADEL_BASE_ID=appFiBKeB4uE6os5e AIRTABLE_PADEL_TABLE_ID=tblnAtmjNbrHI02OT python3 /home/ubuntu/.hermes/scripts/upsert_padel_jobs_airtable.py /tmp/padel_jobs_found.json\n- The helper is schema-aware and also treats normalized role-family + club + location overlap as an update signal.\n\nRequired record schema for accepted results:\n- Job Key\n- Job Title\n- Club Name\n- Role Type\n- Location\n- Country\n- Source Site\n- Source Type\n- Job URL\n- Canonical URL\n- Search Query\n- Posted Text\n- Posted Date Raw\n- Added to table at\n- Summary\n- Email\n- Phone Number\n- Instagram\n- Facebook\n- Other\n\nColumn notes:\n- Do not write: Padel Explicit, Confidence, Status, Exclusion Reason, Raw Snippet, First Seen At, or Last Seen At.\n- Do not set EMAIL SENT? true.\n\nData quality rules:\n- Only write ACCEPTED results to Airtable.\n- Deduplicate within the run before writing.\n- Save accepted results as JSON to /tmp/padel_jobs_found.json, write [] if none, and still run the helper.\n- Use the helper output as truth for created vs updated rows.\n- Only list jobs as NEW in Telegram if they correspond to newly created Airtable rows.\n\nFailure handling:\n- If Firecrawl-backed web tools fail, send a short alert and do NOT claim the market had no jobs.\n- If only some pages fail, continue and mention partial coverage briefly.\n\nFinal Telegram output format:\n1. Start with: \"Padel jobs (English / Rest of world)\"\n2. One short status line\n3. Bullets for NEWLY ADDED jobs only\n4. One short coverage line\n5. One short Airtable created vs updated line\n\nBe concise, high-signal, and evidence-based.",
+      "skills": [
+        "job-monitoring-with-airtable"
+      ],
+      "skill": "job-monitoring-with-airtable",
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 10 * * *",
+        "display": "0 10 * * *"
+      },
+      "schedule_display": "0 10 * * *",
+      "repeat": {
+        "times": null,
+        "completed": 3
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-26T21:51:51.154528+02:00",
+      "next_run_at": "2026-06-30T10:00:00+02:00",
+      "last_run_at": "2026-06-29T10:08:06.325521+02:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "8667992401",
+        "chat_name": "Fausto Genga",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "web",
+        "browser",
+        "terminal",
+        "file",
+        "skills"
+      ],
+      "workdir": null
+    },
+    {
+      "id": "c816556f3626",
+      "name": "padel-jobs-contact-enrichment",
+      "prompt": "You are running a recurring deep-enrichment workflow for the existing Airtable table used by the padel coach job cron jobs. Do NOT touch the Brussels business-lead enrichment workflow. This cron is only for the padel coaches/jobs Airtable table.\n\nMission:\nProcess exactly ONE existing row from the padel coach jobs table per run and enrich it with grounded employer-owned outreach/contact data where possible.\n\nPrimary goals for the selected row:\n1. Find employer-owned contact email(s).\n2. Find employer-owned phone number(s).\n3. Find official social profiles.\n4. Find the employer\u2019s official website and any hiring/contact/about/careers pages.\n5. Improve the Airtable row with outreach-ready contact details, but only when clearly grounded and owned by the actual hiring employer/club/organization.\n\nSelection rules:\n- Work from the existing padel jobs Airtable table already used by the current regional padel cron jobs.\n- Pick exactly one row per run.\n- Prioritize rows that are active/relevant and still missing contact enrichment.\n- If there is a useful ordering field such as First Seen At, enrich oldest eligible rows first.\n\nResearch rules:\n- Use grounded web search first.\n- Use Firecrawl/web extraction on official employer pages when helpful.\n- Use browser fallback when a page is JS-heavy or extraction is thin.\n- Prefer official employer sources over job boards and aggregators.\n- If the posting is from an intermediary and the real employer contact is not exposed, leave contact fields blank rather than guessing.\n- Do not copy recruiter/intermediary contact details into employer-owned outreach fields.\n\nAirtable update rules:\n- Update existing outreach/contact columns when they exist, including fields like Email, Phone Number, Social Medias, Instagram, Facebook, Other, Website, or similar live schema variants.\n- If the table instead has a notes/summary field, add a compact structured contact summary there.\n- Do not create duplicate rows.\n- Do not overwrite strong existing human-edited contact data with weaker guesses.\n- Preserve existing job-tracking workflow fields.\n\nVerification rules:\n- Every stored email/phone/social must have a source URL or clear grounded source.\n- Distinguish high-confidence official contact data from weak snippet-only hints.\n- If no employer-owned contacts can be verified, say so explicitly instead of fabricating data.\n\nDelivery format:\nEnd with a concise Telegram summary including:\n- job title\n- employer/club\n- whether email/phone/socials were found\n- what Airtable fields were updated\n- any blockers (for example only recruiter contact found, official site unavailable, Firecrawl/search limitation)\n\nImportant:\n- This cron is separate from Brussels lead enrichment.\n- This cron is separate from discovery of new padel jobs; it enriches rows already in the padel jobs Airtable table.\n- Process only one row per run.",
+      "skills": [
+        "job-monitoring-with-airtable"
+      ],
+      "skill": "job-monitoring-with-airtable",
+      "model": null,
+      "provider": null,
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "interval",
+        "minutes": 60,
+        "display": "every 60m"
+      },
+      "schedule_display": "every 60m",
+      "repeat": {
+        "times": null,
+        "completed": 20
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-06-28T18:40:17.179403+02:00",
+      "next_run_at": "2026-06-29T18:06:42.992413+02:00",
+      "last_run_at": "2026-06-29T16:06:00.753129+02:00",
+      "last_status": "ok",
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "origin",
+      "origin": {
+        "platform": "telegram",
+        "chat_id": "8667992401",
+        "chat_name": "Fausto Genga",
+        "thread_id": null
+      },
+      "enabled_toolsets": [
+        "web",
+        "browser",
+        "terminal",
+        "file",
+        "skills"
+      ],
+      "workdir": null
+    }
+  ],
+  "updated_at": "2026-06-29T17:06:42.992602+02:00"
+}
