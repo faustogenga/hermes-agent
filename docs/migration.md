@@ -11,7 +11,7 @@ A full migration has four separate layers:
 1. Code layer
    - git repo: `https://github.com/faustogenga/hermes-agent.git`
    - branch: `main`
-   - pinned source commit at time of this guide update: `fc79b3b9c82dd3fa435a1725d66b06fe2d979685`
+   - pinned source commit at time of this guide update: `1be89307ddbc00f9967c3ae336939e8fc8fe9e43`
    - migration docs/scripts inside this repo
 
 2. Hermes state layer
@@ -289,7 +289,7 @@ sudo loginctl enable-linger "$USER"
 ```bash
 git clone https://github.com/faustogenga/hermes-agent.git ~/.hermes/hermes-agent
 cd ~/.hermes/hermes-agent
-git checkout fc79b3b9c82dd3fa435a1725d66b06fe2d979685
+git checkout 1be89307ddbc00f9967c3ae336939e8fc8fe9e43
 ```
 
 ### 3. Restore secrets
@@ -321,7 +321,7 @@ cd ~/.hermes/hermes-agent
 ./scripts/bootstrap_server.sh \
   --target-dir ~/.hermes/hermes-agent \
   --hermes-home ~/.hermes \
-  --repo-ref fc79b3b9c82dd3fa435a1725d66b06fe2d979685 \
+  --repo-ref 1be89307ddbc00f9967c3ae336939e8fc8fe9e43 \
   --backup-zip ~/.hermes/backups/migration-20260707-050233/hermes-backup-full.zip
 ```
 
@@ -332,7 +332,7 @@ cd ~/.hermes/hermes-agent
 ./scripts/bootstrap_server.sh \
   --target-dir ~/.hermes/hermes-agent \
   --hermes-home ~/.hermes \
-  --repo-ref fc79b3b9c82dd3fa435a1725d66b06fe2d979685 \
+  --repo-ref 1be89307ddbc00f9967c3ae336939e8fc8fe9e43 \
   --profile-archive ~/.hermes/backups/migration-20260707-050233/default-profile.tar.gz \
   --profile-archive ~/.hermes/backups/migration-20260707-050233/lead-hunter-brussels-profile.tar.gz
 ```
