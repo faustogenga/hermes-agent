@@ -77,8 +77,30 @@ log "Config paths"
 log "Gateway status"
 "$HERMES_BIN" gateway status || warn "Gateway status check reported a problem"
 
-log "Cron summary"
-"$HERMES_BIN" cron list || warn "Cron list reported a problem"
+log "Cron scheduler status"
+"$HERMES_BIN" cron status || warn "Cron status reported a problem"
+
+log "Cron registry"
+"$HERMES_BIN" cron list --all || warn "Cron list reported a problem"
+
+if [[ -f "$HERMES_HOME/channel_directory.json" ]]; then
+  log "Known Telegram/home channels from channel directory"
+  python3 - <<'PY' "$HERMES_HOME/channel_directory.json"
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1])
+obj = json.loads(p.read_text())
+items = obj.get('platforms', {}).get('telegram', [])
+if not items:
+    print('  none')
+for item in items:
+    print(f"  {item.get('id')} | {item.get('name')} | {item.get('type')} | thread={item.get('thread_id')}")
+PY
+fi
+
+if command -v tailscale >/dev/null 2>&1; then
+  log "Tailscale Serve status"
+  tailscale serve status || warn "tailscale serve status reported a problem"
+fi
 
 if [[ -n "$DASHBOARD_URL" ]]; then
   log "Probing dashboard URL: $DASHBOARD_URL"

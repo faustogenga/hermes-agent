@@ -1,0 +1,73 @@
+{
+  "snapshot": "hermes-state-snapshot-2026-07-07",
+  "generated_at_utc": "2026-07-07T05:06:15Z",
+  "source_hermes_home": "/home/ubuntu/.hermes",
+  "profiles": [
+    "default",
+    "lead-hunter-brussels"
+  ],
+  "job_counts": {
+    "total": 14,
+    "active": 10,
+    "paused": 4
+  },
+  "env_keys": [
+    "TERMINAL_MODAL_IMAGE",
+    "TERMINAL_TIMEOUT",
+    "TERMINAL_LIFETIME_SECONDS",
+    "BROWSERBASE_PROXIES",
+    "BROWSERBASE_ADVANCED_STEALTH",
+    "BROWSER_SESSION_TIMEOUT",
+    "BROWSER_INACTIVITY_TIMEOUT",
+    "WEB_TOOLS_DEBUG",
+    "VISION_TOOLS_DEBUG",
+    "MOA_TOOLS_DEBUG",
+    "IMAGE_TOOLS_DEBUG",
+    "TELEGRAM_BOT_TOKEN",
+    "TELEGRAM_ALLOWED_USERS",
+    "TELEGRAM_HOME_CHANNEL",
+    "TAVILY_API_KEY",
+    "FIRECRAWL_API_KEY",
+    "HUNTER_API_KEY",
+    "APOLLO_API_KEY",
+    "AIRTABLE_PAT",
+    "GOOGLE_MAPS_API_KEY",
+    "GOOGLE_PLACES_API_KEY",
+    "AIRTABLE_WORKSPACE_ID",
+    "GITHUB_TOKEN",
+    "AIRTABLE_BASE_ID",
+    "AIRTABLE_FLIGHTS_TABLE",
+    "FGBUDDY_PROFILE_ID",
+    "FGBUDDY_UNKNOWN_WALLET_ID",
+    "FGBUDDY_SUPABASE_URL",
+    "FGBUDDY_SUPABASE_KEY",
+    "FGBUDDY_TX_WEBHOOK_SECRET",
+    "AIRTABLE_PADEL_BASE_ID",
+    "AIRTABLE_PADEL_TABLE_ID"
+  ],
+  "telegram_channels": [
+    {
+      "id": "8667992401",
+      "name": "Fausto Genga",
+      "type": "dm",
+      "thread_id": null
+    }
+  ],
+  "files": [
+    "README.md",
+    "config.yaml",
+    "cron/jobs.json",
+    "env_keys.txt",
+    "gateway/channel_directory.json",
+    "gateway/gateway_state.json",
+    "gateway/tailscale_serve_status.json",
+    "profiles/lead-hunter-brussels.config.yaml",
+    "scripts/enrich_padel_contacts.py",
+    "scripts/flight_monitor_context.py",
+    "scripts/flight_tracker_airtable.py",
+    "scripts/housing_tracker_airtable.py",
+    "scripts/lead_enrichment_context.py",
+    "scripts/lead_hunter_context.py",
+    "scripts/upsert_padel_jobs_airtable.py"
+  ]
+}

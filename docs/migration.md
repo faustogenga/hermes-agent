@@ -1,294 +1,396 @@
 # Hermes server migration guide
 
-This document describes how to recreate this Hermes setup on a new server without losing the important parts of the current machine.
+This document is the current migration plan for moving this Hermes setup to a new cloud server.
 
-## What gets restored from where
+It is written for a reproducible rebuild, not a one-off copy.
 
-There are **four layers** to a full rebuild:
+## 4-layer restore model
 
-1. **Git repo** — Hermes code, custom code changes, docs, helper scripts, and this migration kit.
-2. **Hermes state backup** — `~/.hermes` user data such as config, skills, memories, sessions, cron state, and auth state.
-3. **Secrets** — `.env` values and any OAuth/device logins that are not stored in git.
-4. **Host-specific infra** — Tailscale, systemd user services, DNS/hostnames, firewall rules, dashboard exposure settings.
+A full migration has four separate layers:
 
-Important Hermes behavior:
+1. Code layer
+   - git repo: `https://github.com/faustogenga/hermes-agent.git`
+   - branch: `main`
+   - pinned source commit at time of this guide update: `fc79b3b9c82dd3fa435a1725d66b06fe2d979685`
+   - migration docs/scripts inside this repo
 
-- `hermes backup` **does include** your Hermes home state.
-- `hermes backup` **does not include** the `~/.hermes/hermes-agent` git checkout.
-- `hermes profile export` / `hermes profile import` are useful for per-profile moves.
-- `hermes import` should be run with the gateway stopped.
+2. Hermes state layer
+   - `~/.hermes/config.yaml`
+   - `~/.hermes/cron/jobs.json`
+   - `~/.hermes/state.db`
+   - `~/.hermes/auth.json`
+   - `~/.hermes/skills/`
+   - `~/.hermes/sessions/`
+   - profile state under `~/.hermes/profiles/`
+   - helper scripts under `~/.hermes/scripts/`
 
-## Current known setup
+3. Secrets layer
+   - `~/.hermes/.env`
+   - profile-specific `.env` files
+   - OAuth/device auth stored in Hermes auth state
+   - third-party API keys for Airtable, Tavily, Firecrawl, Google Places, Telegram, etc.
 
-At the time this migration kit was created:
+4. Host/infra layer
+   - systemd user service for gateway
+   - Tailscale install/login
+   - Tailscale Serve config
+   - dashboard bind strategy
+   - hostname/node identity differences on the new machine
 
-- Canonical repo: `https://github.com/faustogenga/hermes-agent.git`
-- Current branch: `main`
-- Current commit at creation time: `860cf5133a7961e71191de9cf0ac5ea130bfab61`
-- Known profiles:
-  - `default`
-  - `lead-hunter-brussels`
-- Current local migration artifact directory:
-  - `/home/ubuntu/.hermes/backups/migration-20260618-082251`
+Important behavior:
+- `hermes backup` includes Hermes home state.
+- `hermes backup` does not include the `~/.hermes/hermes-agent` git checkout.
+- `hermes profile export` / `hermes profile import` are useful for profile-scoped restores.
+- Telegram bot polling cannot be active from two servers at the same time with the same bot token.
 
-When doing a production migration, prefer a **tag or pinned commit** over a floating branch.
+## Current live setup snapshot
 
-## Files added for migration
+Live facts verified on this server during this migration update:
 
-This repo now includes:
+- Hermes config path: `/home/ubuntu/.hermes/config.yaml`
+- Hermes env path: `/home/ubuntu/.hermes/.env`
+- Active Hermes profile: `default`
+- Additional profile present: `lead-hunter-brussels`
+- Gateway service: `hermes-gateway.service` running under systemd user services
+- Linger: enabled (`loginctl show-user ubuntu -p Linger` => `yes`)
+- Timezone in config: `Europe/Brussels`
+- Messaging platform connected right now: Telegram only
+- Known Telegram DM/home chat in channel directory: `8667992401` (`Fausto Genga`)
+- Current Tailscale Serve mapping:
+  - `https://ip-172-26-13-157.tail82b1d0.ts.net/`
+  - proxied privately to `http://127.0.0.1:9119`
+- Historical pre-dashboard Funnel/Serve config snapshot exists at:
+  - `~/.hermes/backups/tailscale-funnel-before-dashboard.json`
 
+Current cron inventory on this machine at update time:
+- 10 active jobs
+- 4 paused jobs
+- scheduler attached to the running gateway
+
+Current job IDs and names:
+- `548f02dad753` — `brussels-daily-leads` — active
+- `628deedb3571` — `housing-brussels-2p` — paused
+- `47a277b40fed` — `flights-madrid-costa-rica-daily` — paused
+- `57680d9f82f8` — `brussels-lead-enrichment` — active
+- `a75c797f9081` — `global-padel-coach-jobs-daily` — paused
+- `91cdbbf5d133` — `global-padel-coach-jobs-spanish-daily` — paused
+- `3245c1ec26f0` — `padel-jobs-spanish-argentina` — active
+- `8bdf8990a3b6` — `padel-jobs-spanish-spain` — active
+- `fdd2f7cab1a6` — `padel-jobs-spanish-other` — active
+- `357f7bcd43b7` — `padel-jobs-english-us` — active
+- `e447c7b7a62c` — `padel-jobs-english-europe` — active
+- `f3ac339c9b90` — `padel-jobs-english-asia` — active
+- `7906e84ff7f9` — `padel-jobs-english-rest` — active
+- `c816556f3626` — `padel-jobs-contact-enrichment` — active
+
+## Migration artifacts in this repo
+
+This repo should contain the migration kit itself:
 - `docs/migration.md`
 - `scripts/bootstrap_server.sh`
 - `scripts/verify_install.sh`
+- `scripts/export_migration_state.sh`
 - `.env.template`
-- `migration-artifacts/hermes-state-snapshot-2026-06-29/`
+- `migration-artifacts/hermes-state-snapshot-2026-07-07/`
 
-The Hermes-state snapshot is a non-secret export of important local state that normally lives outside the git checkout, including the cron registry and selected helper scripts used by the current Brussels/padel workflows.
+The snapshot directory is intentionally non-secret and captures current runtime shape that normally lives outside git.
 
-## Recommended backup artifacts
+## Non-secret runtime snapshot contents
 
-Create these on the source server before migration:
+The exported state snapshot should include at least:
+- current `cron/jobs.json`
+- current `channel_directory.json`
+- current `gateway_state.json`
+- current `config.yaml` copies for default/profile scope
+- helper scripts from `~/.hermes/scripts/`
+- env variable names only, not values
+- Tailscale Serve status JSON when available
+- a small human-readable summary of jobs, profiles, Telegram, and Tailscale
 
-### 1. Full Hermes backup
+## Secrets and auth that must move separately
 
-```bash
-mkdir -p ~/.hermes/backups/migration-20260618-082251
-hermes backup -o ~/.hermes/backups/migration-20260618-082251/hermes-backup-full.zip
-```
-
-This is the main disaster-recovery artifact.
-
-### 2. Optional per-profile archives
-
-```bash
-hermes profile export default -o ~/.hermes/backups/migration-20260618-082251/default-profile.tar.gz
-hermes profile export lead-hunter-brussels -o ~/.hermes/backups/migration-20260618-082251/lead-hunter-brussels-profile.tar.gz
-```
-
-Use these when you want profile-level import/export instead of a whole-home restore.
-
-### 3. Secrets bundle
-
-Do **not** commit real secrets to git.
-
-Keep a secure copy of:
-
+These do not belong in git:
 - `~/.hermes/.env`
-- any profile-specific `.env` files
-- any extra credentials not covered by the Hermes backup strategy
+- `~/.hermes/profiles/*/.env`
+- `~/.hermes/auth.json` if handled outside the full backup flow
+- Telegram bot token
+- Airtable, Tavily, Firecrawl, Hunter, Apollo, Google, Supabase, GitHub, and other API keys
 
-Recommended storage:
-
-- 1Password / Bitwarden
-- encrypted archive
-- cloud secret manager
+Discovered environment-variable keys currently used on this server:
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_ALLOWED_USERS`
+- `TELEGRAM_HOME_CHANNEL`
+- `TAVILY_API_KEY`
+- `FIRECRAWL_API_KEY`
+- `HUNTER_API_KEY`
+- `APOLLO_API_KEY`
+- `AIRTABLE_PAT`
+- `AIRTABLE_WORKSPACE_ID`
+- `AIRTABLE_BASE_ID`
+- `AIRTABLE_FLIGHTS_TABLE`
+- `AIRTABLE_PADEL_BASE_ID`
+- `AIRTABLE_PADEL_TABLE_ID`
+- `GOOGLE_MAPS_API_KEY`
+- `GOOGLE_PLACES_API_KEY`
+- `GITHUB_TOKEN`
+- `FGBUDDY_PROFILE_ID`
+- `FGBUDDY_UNKNOWN_WALLET_ID`
+- `FGBUDDY_SUPABASE_URL`
+- `FGBUDDY_SUPABASE_KEY`
+- `FGBUDDY_TX_WEBHOOK_SECRET`
 
 ## Source-server checklist
 
-Run this on the current server before switching hosts:
+Do this on the old server before cutover.
 
-### A. Make sure repo code is committed and pushed
+### 1. Commit and push the migration kit first
 
 ```bash
 cd ~/.hermes/hermes-agent
 git status
-git add docs/migration.md scripts/bootstrap_server.sh scripts/verify_install.sh .env.template
-git commit -m "docs: add server migration kit"
+git add docs/migration.md scripts/bootstrap_server.sh scripts/verify_install.sh scripts/export_migration_state.sh .env.template migration-artifacts
+git commit -m "docs: refresh Hermes server migration kit"
 git push origin main
 ```
 
-If you have other uncommitted local code changes you want preserved, commit and push those too.
-
-### B. Create a full backup
+### 2. Export the current non-secret runtime snapshot
 
 ```bash
-mkdir -p ~/.hermes/backups/migration-20260618-082251
-hermes backup -o ~/.hermes/backups/migration-20260618-082251/hermes-backup-full.zip
+cd ~/.hermes/hermes-agent
+./scripts/export_migration_state.sh --snapshot-name hermes-state-snapshot-2026-07-07
 ```
 
-### C. Optionally export profiles
+### 3. Create fresh backup artifacts
+
+Use a new migration directory for this cutover:
 
 ```bash
-hermes profile export default -o ~/.hermes/backups/migration-20260618-082251/default-profile.tar.gz
-hermes profile export lead-hunter-brussels -o ~/.hermes/backups/migration-20260618-082251/lead-hunter-brussels-profile.tar.gz
+export MIGRATION_DIR="$HOME/.hermes/backups/migration-20260707-050233"
+mkdir -p "$MIGRATION_DIR"
+
+hermes backup -o "$MIGRATION_DIR/hermes-backup-full.zip"
+hermes profile export default -o "$MIGRATION_DIR/default-profile.tar.gz"
+hermes profile export lead-hunter-brussels -o "$MIGRATION_DIR/lead-hunter-brussels-profile.tar.gz"
+
+tar -czf "$MIGRATION_DIR/secrets-bundle.tar.gz" \
+  -C "$HOME" \
+  .hermes/.env \
+  .hermes/auth.json \
+  .hermes/profiles/lead-hunter-brussels/.env
 ```
 
-### D. Record the exact git ref
+Notes:
+- the secrets bundle is sensitive; keep it encrypted/off-git
+- full backup is the best disaster-recovery artifact
+- profile archives are useful when you want more selective restore behavior
+
+### 4. Record the exact git ref used for the migration
 
 ```bash
 cd ~/.hermes/hermes-agent
 git rev-parse HEAD
 ```
 
-Use that ref during the rebuild if you want an exact match.
+## Telegram takeover plan
+
+The simplest and correct way to keep the existing Telegram setup is to reuse the same bot token and move the polling endpoint to the new server.
+
+Important constraint:
+- this setup uses Telegram polling
+- only one running gateway may poll the same bot at a time
+- if both servers run Hermes with the same `TELEGRAM_BOT_TOKEN`, Telegram will return a polling conflict and one instance will lose
+
+Recommended cutover sequence:
+
+1. Restore the new server fully, including `.env` and Hermes auth state.
+2. Confirm `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_USERS`, and `TELEGRAM_HOME_CHANNEL` are present on the new server.
+3. Keep the old server running until the new one is ready.
+4. At cutover time, stop the old gateway:
+
+```bash
+hermes gateway stop
+# or
+systemctl --user stop hermes-gateway
+```
+
+5. Start the gateway on the new server:
+
+```bash
+hermes gateway install
+hermes gateway restart || hermes gateway start
+```
+
+6. Verify:
+
+```bash
+hermes gateway status
+tail -n 80 ~/.hermes/logs/gateway.log
+```
+
+Expected success condition:
+- Telegram shows connected on the new server
+- no continuing `Conflict: terminated by other getUpdates request` loop after the old gateway is down
+
+If you want to keep the same bot identity and same DM/home channel, do not create a new bot; just move the token and stop the old poller.
+
+## Tailscale takeover plan
+
+Current known private Serve config on the old server:
+
+```text
+https://ip-172-26-13-157.tail82b1d0.ts.net/
+  -> proxy http://127.0.0.1:9119
+```
+
+This is tailnet-only Serve, not public Funnel.
+
+On the new server:
+
+1. Install and log into Tailscale.
+2. Confirm the new node joins the same tailnet.
+3. Start the Hermes dashboard locally.
+4. Recreate Serve on the new node.
+
+Suggested commands:
+
+```bash
+tailscale status
+hermes dashboard --host 127.0.0.1 --port 9119 --no-open --skip-build
+tailscale serve http://127.0.0.1:9119
+tailscale serve status
+```
+
+Notes:
+- the new node name and `.ts.net` hostname will probably differ from the old server
+- if you need MagicDNS/Tailscale access only, keep the dashboard bound to `127.0.0.1` and use Tailscale Serve as the proxy
+- if you instead want direct network access to the dashboard over the tailnet without Serve, bind Hermes to `0.0.0.0` and follow the Host-header caveats
+- the historical Funnel/Serve JSON saved in `~/.hermes/backups/tailscale-funnel-before-dashboard.json` is useful if you later want to restore the old `/webhook/tx` publishing behavior
 
 ## Target-server rebuild flow
 
-## 1. Prepare the new host
+### 1. Prepare host prerequisites
 
-Install the basic host tools first:
-
+Install the baseline host tools:
 - git
 - curl
 - uv
 - node/npm
 - python 3.11+
-- Tailscale (if remote dashboard/gateway access depends on it)
+- tailscale
 
-Also enable the user session/service behavior you expect, especially if you want the gateway to survive logout.
-
-## 2. Clone the repo
-
-```bash
-git clone https://github.com/faustogenga/hermes-agent.git ~/.hermes/hermes-agent
-cd ~/.hermes/hermes-agent
-```
-
-For exact reproducibility, checkout a pinned ref:
-
-```bash
-git checkout 860cf5133a7961e71191de9cf0ac5ea130bfab61
-```
-
-Or use a migration tag if you created one.
-
-## 3. Add secrets
-
-Copy `.env.template` to the location you want to fill in later, or place a real env file on the new host before bootstrapping.
-
-Example:
-
-```bash
-cp .env.template ~/.hermes/.env
-```
-
-Then fill in the real values securely.
-
-## 4. Run the bootstrap script
-
-Example with a full backup restore:
-
-```bash
-cd ~/.hermes/hermes-agent
-./scripts/bootstrap_server.sh \
-  --target-dir ~/.hermes/hermes-agent \
-  --hermes-home ~/.hermes \
-  --repo-ref 860cf5133a7961e71191de9cf0ac5ea130bfab61 \
-  --backup-zip ~/.hermes/backups/migration-20260618-082251/hermes-backup-full.zip
-```
-
-Example with profile archives instead of a full backup:
-
-```bash
-cd ~/.hermes/hermes-agent
-./scripts/bootstrap_server.sh \
-  --target-dir ~/.hermes/hermes-agent \
-  --hermes-home ~/.hermes \
-  --repo-ref 860cf5133a7961e71191de9cf0ac5ea130bfab61 \
-  --profile-archive ~/.hermes/backups/migration-20260618-082251/default-profile.tar.gz \
-  --profile-archive ~/.hermes/backups/migration-20260618-082251/lead-hunter-brussels-profile.tar.gz
-```
-
-## Actual local artifacts created on this server
-
-These were created locally and intentionally **not committed to git**:
-
-- `~/.hermes/backups/migration-20260618-082251/hermes-backup-full.zip`
-- `~/.hermes/backups/migration-20260618-082251/default-profile.tar.gz`
-- `~/.hermes/backups/migration-20260618-082251/lead-hunter-brussels-profile.tar.gz`
-
-Use them directly during migration from secure local or encrypted storage. If you move them off-machine, treat them as sensitive credentials/state archives.
-
-## 5. Verify the rebuild
-
-```bash
-cd ~/.hermes/hermes-agent
-./scripts/verify_install.sh
-```
-
-Optional dashboard verification:
-
-```bash
-./scripts/verify_install.sh --dashboard-url http://127.0.0.1:9119/
-```
-
-Optional Firecrawl verification:
-
-```bash
-./scripts/verify_install.sh --check-firecrawl
-```
-
-## Host-specific tasks that still need manual attention
-
-These are intentionally **not** fully automated because they depend on the destination machine:
-
-### Tailscale
-
-Reinstall/login and then reapply any serve/funnel settings, for example:
-
-```bash
-tailscale serve status
-```
-
-If you expose the dashboard over Tailscale and want MagicDNS access, make sure the dashboard binding matches your exposure strategy.
-
-### Dashboard binding
-
-Local-only dashboard:
-
-```bash
-hermes dashboard --host 127.0.0.1 --port 9119 --no-open --skip-build
-```
-
-Tailscale-accessible dashboard:
-
-```bash
-hermes dashboard --host 0.0.0.0 --port 9119 --insecure --no-open --skip-build
-```
-
-### Gateway service
-
-The bootstrap script attempts to install/restart the gateway service, but you should still verify:
-
-```bash
-hermes gateway status
-```
-
-### Systemd linger
-
-If needed for services to survive logout:
+Also enable user linger if you want the gateway to survive logout:
 
 ```bash
 sudo loginctl enable-linger "$USER"
 ```
 
-## Recovery strategy
+### 2. Clone the repo
 
-### Fastest full recovery
+```bash
+git clone https://github.com/faustogenga/hermes-agent.git ~/.hermes/hermes-agent
+cd ~/.hermes/hermes-agent
+git checkout fc79b3b9c82dd3fa435a1725d66b06fe2d979685
+```
 
-1. Clone repo.
-2. Checkout pinned ref.
-3. Restore secrets.
-4. Run `bootstrap_server.sh` with `--backup-zip`.
-5. Reapply host-specific infra.
-6. Run `verify_install.sh`.
+### 3. Restore secrets
+
+Preferred options:
+- restore from secure secret storage
+- unpack the encrypted `secrets-bundle.tar.gz`
+- or restore from full Hermes backup if you trust that path for this migration
+
+At minimum, make sure the new host gets:
+- `~/.hermes/.env`
+- `~/.hermes/auth.json` or equivalent Hermes auth state
+- any profile-specific env files
+
+### 4. Copy backup artifacts to the new server
+
+Expected cutover artifact set from this migration:
+- `hermes-backup-full.zip`
+- `default-profile.tar.gz`
+- `lead-hunter-brussels-profile.tar.gz`
+- `secrets-bundle.tar.gz`
+
+### 5. Run bootstrap
+
+Full backup restore path:
+
+```bash
+cd ~/.hermes/hermes-agent
+./scripts/bootstrap_server.sh \
+  --target-dir ~/.hermes/hermes-agent \
+  --hermes-home ~/.hermes \
+  --repo-ref fc79b3b9c82dd3fa435a1725d66b06fe2d979685 \
+  --backup-zip ~/.hermes/backups/migration-20260707-050233/hermes-backup-full.zip
+```
+
+Profile-based restore path:
+
+```bash
+cd ~/.hermes/hermes-agent
+./scripts/bootstrap_server.sh \
+  --target-dir ~/.hermes/hermes-agent \
+  --hermes-home ~/.hermes \
+  --repo-ref fc79b3b9c82dd3fa435a1725d66b06fe2d979685 \
+  --profile-archive ~/.hermes/backups/migration-20260707-050233/default-profile.tar.gz \
+  --profile-archive ~/.hermes/backups/migration-20260707-050233/lead-hunter-brussels-profile.tar.gz
+```
+
+Important restore-order note:
+- if you are both importing a backup and copying a fresh env file, copy the env file after import so the backup does not overwrite your intended secrets file
+
+### 6. Re-enable Telegram on the new server
+
+Use the Telegram takeover sequence described above.
+
+### 7. Re-enable Tailscale access on the new server
+
+Use the Tailscale takeover sequence described above.
+
+### 8. Verify the rebuilt machine
+
+```bash
+cd ~/.hermes/hermes-agent
+./scripts/verify_install.sh --dashboard-url http://127.0.0.1:9119/
+```
+
+Optional live Firecrawl verification:
+
+```bash
+./scripts/verify_install.sh --check-firecrawl
+```
+
+## Recovery paths
+
+### Fastest recovery
+1. Clone repo
+2. Checkout pinned commit
+3. Restore `.env` and auth state
+4. Import full Hermes backup
+5. Start gateway
+6. Recreate Tailscale Serve
+7. Stop old Telegram poller and start new one
+8. Verify
 
 ### Cleaner reproducible rebuild
+1. Clone repo
+2. Checkout pinned commit
+3. Restore secrets
+4. Import selected profile archives or minimal state
+5. Recreate host-specific infra explicitly
+6. Verify
 
-1. Clone repo.
-2. Checkout pinned ref.
-3. Restore secrets from secure secret storage.
-4. Run `bootstrap_server.sh` without a full backup, or with per-profile archives.
-5. Reconfigure host-specific infra.
-6. Run `verify_install.sh`.
+## Success criteria for cutover
 
-## Summary
+The migration is complete when all of these are true on the new server:
+- `hermes gateway status` shows running
+- `hermes cron status` shows the scheduler active
+- `hermes cron list --all` matches the expected jobs and paused/active states
+- `hermes profile list` shows `default` and `lead-hunter-brussels`
+- Telegram is connected on the new server and disconnected on the old one
+- Tailscale Serve points the new node hostname to `http://127.0.0.1:9119`
+- dashboard probe returns HTTP 200 locally
+- required env vars and auth state are present
 
-Reproducibility for this setup means:
-
-- **git** restores the code
-- **Hermes backup/profile archives** restore the Hermes state
-- **secret storage** restores credentials
-- **bootstrap + verify scripts** restore machine behavior
-
-That combination is what makes a new server rebuildable instead of depending on one snowflake machine.
+That is the point where the new server truly “knows everything” operationally that this server knows.
