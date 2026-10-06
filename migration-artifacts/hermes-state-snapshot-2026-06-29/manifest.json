@@ -1,0 +1,11 @@
+{
+  "snapshot": "hermes-state-snapshot-2026-06-29",
+  "source_hermes_home": "/home/ubuntu/.hermes",
+  "files": [
+    "cron/jobs.json",
+    "scripts/enrich_padel_contacts.py",
+    "scripts/upsert_padel_jobs_airtable.py",
+    "scripts/lead_enrichment_context.py",
+    "README.md"
+  ]
+}
