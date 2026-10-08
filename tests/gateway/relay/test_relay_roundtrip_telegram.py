@@ -22,7 +22,7 @@ from __future__ import annotations
 import pytest
 
 from gateway.config import Platform, PlatformConfig
-from gateway.platforms.base import MessageEvent, MessageType
+from gateway.platforms.event import MessageEvent, MessageType
 from gateway.session import SessionSource, build_session_key
 from gateway.relay.adapter import RelayAdapter
 from gateway.relay.descriptor import CONTRACT_VERSION, CapabilityDescriptor
@@ -111,4 +111,3 @@ async def test_inbound_telegram_event_reaches_adapter(wired, monkeypatch):
 
 async def _async_capture(sink, event):
     sink.append(event)
-    return None
